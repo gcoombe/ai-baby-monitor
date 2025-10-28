@@ -1,0 +1,59 @@
+# AI Baby Monitor Configuration
+
+camera:
+  device: 0  # Camera device index (0 for default)
+  resolution: [640, 480]
+  fps: 10
+  rotation: 0  # 0, 90, 180, or 270 degrees
+
+audio:
+  device_index: null  # null for default microphone
+  sample_rate: 16000
+  chunk_size: 1024
+  channels: 1
+
+detection:
+  video:
+    motion_threshold: 25  # Sensitivity for motion detection (lower = more sensitive)
+    motion_min_area: 500  # Minimum area in pixels to consider as motion
+    awake_confidence_threshold: 0.7  # Confidence threshold for awake detection
+    check_interval: 2  # Seconds between checks
+
+  audio:
+    cry_threshold: 0.6  # Confidence threshold for cry detection
+    noise_threshold: 1000  # RMS threshold for significant noise
+    check_interval: 1  # Seconds between checks
+
+sleep_tracking:
+  awake_confirmation_time: 30  # Seconds of continuous activity to confirm awake
+  sleep_confirmation_time: 300  # Seconds of inactivity to confirm asleep (5 minutes)
+
+notifications:
+  enabled: true
+  methods:
+    - console  # Options: console, pushbullet, webhook
+
+  pushbullet:
+    api_key: ""  # Add your Pushbullet API key
+
+  webhook:
+    url: ""  # Custom webhook URL for notifications
+
+  events:
+    baby_awake: true
+    baby_stirring: true
+    cry_detected: true
+    long_wake_period: true  # Alert if awake for extended period
+
+database:
+  path: "data/baby_monitor.db"
+
+web:
+  enabled: true
+  host: "0.0.0.0"
+  port: 5000
+  debug: false
+
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  file: "logs/baby_monitor.log"

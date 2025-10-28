@@ -1,0 +1,17 @@
+[Unit]
+Description=AI Baby Monitor
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/ai-baby-monitor
+Environment="PATH=/home/pi/ai-baby-monitor/venv/bin"
+ExecStart=/home/pi/ai-baby-monitor/venv/bin/python main.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

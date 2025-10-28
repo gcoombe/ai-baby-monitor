@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Baby Monitor Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: white;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .card h2 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 1.5em;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .status-indicator.running {
+            background: #10b981;
+            box-shadow: 0 0 8px #10b981;
+        }
+
+        .status-indicator.stopped {
+            background: #ef4444;
+        }
+
+        .status-indicator.asleep {
+            background: #3b82f6;
+            box-shadow: 0 0 8px #3b82f6;
+        }
+
+        .status-indicator.awake {
+            background: #f59e0b;
+            box-shadow: 0 0 8px #f59e0b;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .stat-row:last-child {
+            border-bottom: none;
+        }
+
+        .stat-label {
+            font-weight: 600;
+            color: #6b7280;
+        }
+
+        .stat-value {
+            color: #1f2937;
+            font-weight: 500;
+        }
+
+        .video-container {
+            grid-column: 1 / -1;
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .video-feed {
+            width: 100%;
+            max-height: 600px;
+            object-fit: contain;
+            background: #000;
+            border-radius: 8px;
+        }
+
+        .events-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .event-item {
+            padding: 12px;
+            margin-bottom: 8px;
+            background: #f9fafb;
+            border-radius: 6px;
+            border-left: 4px solid #667eea;
+        }
+
+        .event-item.cry {
+            border-left-color: #ef4444;
+        }
+
+        .event-item.awake {
+            border-left-color: #f59e0b;
+        }
+
+        .event-item.asleep {
+            border-left-color: #3b82f6;
+        }
+
+        .event-item.stirring {
+            border-left-color: #8b5cf6;
+        }
+
+        .event-time {
+            font-size: 0.85em;
+            color: #6b7280;
+        }
+
+        .event-type {
+            font-weight: 600;
+            text-transform: capitalize;
+            margin: 4px 0;
+        }
+
+        .confidence {
+            font-size: 0.9em;
+            color: #059669;
+        }
+
+        .sleep-session {
+            padding: 15px;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #667eea15, #764ba215);
+            border-radius: 8px;
+        }
+
+        .big-stat {
+            text-align: center;
+            padding: 20px;
+        }
+
+        .big-stat-value {
+            font-size: 3em;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .big-stat-label {
+            font-size: 1.1em;
+            color: #6b7280;
+            margin-top: 10px;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .loading {
+            animation: pulse 2s ease-in-out infinite;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>AI Baby Monitor Dashboard</h1>
+
+        <div class="grid">
+            <!-- Current Status -->
+            <div class="card">
+                <h2>Current Status</h2>
+                <div class="stat-row">
+                    <span class="stat-label">Monitor Status</span>
+                    <span class="stat-value">
+                        <span class="status-indicator" id="monitor-status"></span>
+                        <span id="monitor-status-text">Loading...</span>
+                    </span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Baby Status</span>
+                    <span class="stat-value">
+                        <span class="status-indicator" id="baby-status"></span>
+                        <span id="baby-status-text">Loading...</span>
+                    </span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Last Motion</span>
+                    <span class="stat-value" id="last-motion">-</span>
+                </div>
+            </div>
+
+            <!-- Current Sleep Session -->
+            <div class="card">
+                <h2>Current Sleep Session</h2>
+                <div id="current-session">
+                    <div class="big-stat">
+                        <div class="big-stat-value" id="sleep-duration">-</div>
+                        <div class="big-stat-label">Minutes Asleep</div>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Stir Count</span>
+                        <span class="stat-value" id="stir-count">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sleep Statistics -->
+            <div class="card">
+                <h2>7-Day Statistics</h2>
+                <div class="stat-row">
+                    <span class="stat-label">Total Sleep Time</span>
+                    <span class="stat-value" id="total-sleep-time">-</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Average Duration</span>
+                    <span class="stat-value" id="avg-duration">-</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Average Quality</span>
+                    <span class="stat-value" id="avg-quality">-</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Sleep Sessions</span>
+                    <span class="stat-value" id="total-sessions">-</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Video Feed -->
+        <div class="video-container">
+            <h2>Live Video Feed</h2>
+            <img src="/video-feed" class="video-feed" alt="Video feed not available">
+        </div>
+
+        <div class="grid">
+            <!-- Recent Events -->
+            <div class="card" style="grid-column: 1 / -1;">
+                <h2>Recent Events</h2>
+                <div class="events-list" id="events-list">
+                    <div class="loading">Loading events...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Update dashboard every 2 seconds
+        function updateDashboard() {
+            // Fetch status
+            fetch('/api/status')
+                .then(response => response.json())
+                .then(data => {
+                    // Update monitor status
+                    const monitorStatus = document.getElementById('monitor-status');
+                    const monitorStatusText = document.getElementById('monitor-status-text');
+                    if (data.running) {
+                        monitorStatus.className = 'status-indicator running';
+                        monitorStatusText.textContent = 'Running';
+                    } else {
+                        monitorStatus.className = 'status-indicator stopped';
+                        monitorStatusText.textContent = 'Stopped';
+                    }
+
+                    // Update baby status
+                    const babyStatus = document.getElementById('baby-status');
+                    const babyStatusText = document.getElementById('baby-status-text');
+                    if (data.video.baby_awake) {
+                        babyStatus.className = 'status-indicator awake';
+                        babyStatusText.textContent = 'Awake';
+                    } else {
+                        babyStatus.className = 'status-indicator asleep';
+                        babyStatusText.textContent = 'Asleep';
+                    }
+
+                    // Update last motion
+                    const lastMotion = document.getElementById('last-motion');
+                    if (data.video.last_motion) {
+                        const date = new Date(data.video.last_motion);
+                        lastMotion.textContent = date.toLocaleString();
+                    } else {
+                        lastMotion.textContent = 'No motion detected';
+                    }
+
+                    // Update current sleep session
+                    const sleepDuration = document.getElementById('sleep-duration');
+                    const stirCount = document.getElementById('stir-count');
+                    if (data.current_sleep_session) {
+                        sleepDuration.textContent = Math.floor(data.current_sleep_session.duration_minutes);
+                        stirCount.textContent = data.current_sleep_session.stir_count;
+                    } else {
+                        sleepDuration.textContent = '-';
+                        stirCount.textContent = '-';
+                    }
+                })
+                .catch(error => console.error('Error fetching status:', error));
+
+            // Fetch statistics
+            fetch('/api/statistics')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('total-sleep-time').textContent =
+                        `${(data.total_sleep_time / 60).toFixed(1)} hours`;
+                    document.getElementById('avg-duration').textContent =
+                        `${data.average_duration.toFixed(0)} minutes`;
+                    document.getElementById('avg-quality').textContent =
+                        `${data.average_quality.toFixed(0)}%`;
+                    document.getElementById('total-sessions').textContent =
+                        data.total_sessions;
+                })
+                .catch(error => console.error('Error fetching statistics:', error));
+
+            // Fetch recent events
+            fetch('/api/events')
+                .then(response => response.json())
+                .then(data => {
+                    const eventsList = document.getElementById('events-list');
+                    if (data.length === 0) {
+                        eventsList.innerHTML = '<div class="event-item">No events yet</div>';
+                        return;
+                    }
+
+                    eventsList.innerHTML = data.map(event => {
+                        const date = new Date(event.timestamp);
+                        const confidence = event.confidence ?
+                            `<div class="confidence">Confidence: ${(event.confidence * 100).toFixed(0)}%</div>` : '';
+                        return `
+                            <div class="event-item ${event.event_type}">
+                                <div class="event-time">${date.toLocaleString()}</div>
+                                <div class="event-type">${event.event_type}</div>
+                                ${confidence}
+                            </div>
+                        `;
+                    }).join('');
+                })
+                .catch(error => console.error('Error fetching events:', error));
+        }
+
+        // Initial update
+        updateDashboard();
+
+        // Update every 2 seconds
+        setInterval(updateDashboard, 2000);
+    </script>
+</body>
+</html>

@@ -1,0 +1,438 @@
+# AI Baby Monitor
+
+An intelligent baby monitoring system that uses computer vision and audio processing to track your baby's sleep patterns, detect when they wake up or stir, and send real-time notifications. Designed to run on Raspberry Pi.
+
+## Features
+
+- **Video Monitoring**: Real-time motion detection and activity tracking using computer vision
+- **Audio Monitoring**: Cry detection and sound analysis
+- **Sleep Tracking**: Automatically tracks sleep sessions, duration, and quality
+- **Smart Notifications**: Alerts you when:
+  - Baby wakes up
+  - Baby is stirring
+  - Crying is detected
+  - Extended wake periods
+- **Web Dashboard**: Real-time monitoring interface with live video feed and statistics
+- **Event Logging**: Complete history of all events and sleep sessions
+- **Configurable**: Highly customizable detection thresholds and notification preferences
+
+## Architecture
+
+```
+ai-baby-monitor/
+├── main.py                 # Main application entry point
+├── config.yaml            # Configuration file
+├── requirements.txt       # Python dependencies
+├── database/
+│   └── db_manager.py     # SQLite database management
+├── monitors/
+│   ├── video_monitor.py  # Video processing and motion detection
+│   └── audio_monitor.py  # Audio processing and cry detection
+├── notifiers/
+│   └── notification_manager.py  # Multi-channel notifications
+└── web/
+    ├── app.py            # Flask web server
+    └── templates/
+        └── index.html    # Web dashboard
+```
+
+## Hardware Requirements
+
+### Raspberry Pi Setup
+- Raspberry Pi 3B+ or newer (Pi 4 recommended for better performance)
+- Raspberry Pi Camera Module or USB webcam
+- USB microphone (optional, for audio monitoring)
+- MicroSD card (16GB+ recommended)
+- Power supply
+
+### Alternative Setup
+The application can also run on:
+- Desktop/laptop with webcam and microphone
+- Any Linux-based system with camera access
+
+## Software Requirements
+
+- Python 3.8 or higher
+- Raspberry Pi OS (or any Linux distribution)
+- Internet connection (for notifications)
+
+## Installation
+
+### On Raspberry Pi
+
+1. **Update your system**
+```bash
+sudo apt-get update
+sudo apt-get upgrade -y
+```
+
+2. **Install system dependencies**
+```bash
+# Install OpenCV dependencies
+sudo apt-get install -y python3-opencv libopencv-dev
+
+# Install audio dependencies
+sudo apt-get install -y portaudio19-dev python3-pyaudio
+
+# Install other dependencies
+sudo apt-get install -y python3-pip python3-dev
+```
+
+3. **Clone or download this project**
+```bash
+cd ~
+git clone <your-repo-url> ai-baby-monitor
+cd ai-baby-monitor
+```
+
+4. **Create virtual environment**
+```bash
+python3 -m venv venv
+source venv/bin/activate
+```
+
+5. **Install Python dependencies**
+```bash
+pip install -r requirements.txt
+```
+
+### On Desktop/Laptop
+
+1. **Install Python 3.8+**
+
+2. **Clone the project**
+```bash
+git clone <your-repo-url> ai-baby-monitor
+cd ai-baby-monitor
+```
+
+3. **Create virtual environment**
+```bash
+python -m venv venv
+
+# On Linux/Mac:
+source venv/bin/activate
+
+# On Windows:
+venv\Scripts\activate
+```
+
+4. **Install dependencies**
+```bash
+pip install -r requirements.txt
+```
+
+## Configuration
+
+1. **Copy the example environment file**
+```bash
+cp .env.example .env
+```
+
+2. **Edit .env with your credentials** (optional)
+```bash
+nano .env
+```
+
+Add your Pushbullet API key if you want push notifications:
+```
+PUSHBULLET_API_KEY=your_api_key_here
+```
+
+Get your API key from: https://www.pushbullet.com/#settings/account
+
+3. **Edit config.yaml** to customize settings
+```bash
+nano config.yaml
+```
+
+Key settings to adjust:
+- `camera.device`: Camera index (0 for default, 1 for second camera)
+- `camera.resolution`: Lower resolution for Raspberry Pi (e.g., [640, 480])
+- `camera.rotation`: Rotate camera feed if needed (0, 90, 180, 270)
+- `detection.video.motion_threshold`: Lower = more sensitive
+- `detection.audio.cry_threshold`: Confidence threshold for cry detection
+- `notifications.methods`: Choose notification channels (console, pushbullet, webhook)
+
+## Usage
+
+### Basic Usage
+
+1. **Activate virtual environment**
+```bash
+source venv/bin/activate  # On Linux/Mac
+# or
+venv\Scripts\activate  # On Windows
+```
+
+2. **Run the monitor**
+```bash
+python main.py
+```
+
+3. **Access the web dashboard**
+Open your browser and go to:
+```
+http://localhost:5000
+```
+
+Or from another device on the same network:
+```
+http://<raspberry-pi-ip>:5000
+```
+
+To find your Raspberry Pi IP:
+```bash
+hostname -I
+```
+
+### Running as a System Service (Raspberry Pi)
+
+To run the monitor automatically on startup:
+
+1. **Create a systemd service file**
+```bash
+sudo nano /etc/systemd/system/baby-monitor.service
+```
+
+2. **Add the following content** (adjust paths as needed):
+```ini
+[Unit]
+Description=AI Baby Monitor
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/ai-baby-monitor
+Environment="PATH=/home/pi/ai-baby-monitor/venv/bin"
+ExecStart=/home/pi/ai-baby-monitor/venv/bin/python main.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+```
+
+3. **Enable and start the service**
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable baby-monitor
+sudo systemctl start baby-monitor
+```
+
+4. **Check status**
+```bash
+sudo systemctl status baby-monitor
+```
+
+5. **View logs**
+```bash
+sudo journalctl -u baby-monitor -f
+```
+
+## Web Dashboard
+
+The web dashboard provides:
+- Live video feed from the camera
+- Current monitoring status (running, baby awake/asleep)
+- Current sleep session duration and stir count
+- 7-day sleep statistics
+- Recent events timeline with confidence scores
+- Auto-refreshing every 2 seconds
+
+## Notification Options
+
+### Console Notifications
+Prints alerts to the terminal/logs (enabled by default)
+
+### Pushbullet Notifications
+Sends push notifications to your phone and devices:
+1. Create account at https://www.pushbullet.com
+2. Get API key from account settings
+3. Add to `.env` file
+4. Enable in `config.yaml` under `notifications.methods`
+
+### Custom Webhook
+Send notifications to your own endpoint:
+1. Set webhook URL in `.env` or `config.yaml`
+2. Enable in `config.yaml` under `notifications.methods`
+
+Webhook payload format:
+```json
+{
+  "title": "Baby is Awake!",
+  "message": "Your baby has woken up and is active.",
+  "event_type": "baby_awake",
+  "timestamp": "2024-01-15T10:30:00"
+}
+```
+
+## Camera Setup
+
+### Raspberry Pi Camera Module
+1. Enable camera interface:
+```bash
+sudo raspi-config
+# Navigate to: Interface Options -> Camera -> Enable
+```
+
+2. Reboot:
+```bash
+sudo reboot
+```
+
+3. Test camera:
+```bash
+raspistill -o test.jpg
+```
+
+### USB Webcam
+Should work automatically. If you have multiple cameras, adjust `camera.device` in `config.yaml`.
+
+## Troubleshooting
+
+### Camera not detected
+```bash
+# List available cameras
+ls /dev/video*
+
+# Try different device numbers in config.yaml (0, 1, 2, etc.)
+```
+
+### Audio not working
+```bash
+# List audio devices
+arecord -l
+
+# Test microphone
+arecord -d 5 test.wav
+aplay test.wav
+```
+
+### High CPU usage on Raspberry Pi
+- Reduce camera resolution in `config.yaml` (e.g., [320, 240])
+- Reduce FPS (e.g., 5-10 fps)
+- Increase `check_interval` values
+
+### Web dashboard not accessible
+```bash
+# Check if Flask is running
+sudo netstat -tulpn | grep 5000
+
+# Allow port through firewall (if applicable)
+sudo ufw allow 5000
+```
+
+## Database
+
+Sleep data and events are stored in SQLite database at `data/baby_monitor.db`.
+
+To query the database directly:
+```bash
+sqlite3 data/baby_monitor.db
+```
+
+Example queries:
+```sql
+-- View recent events
+SELECT * FROM events ORDER BY timestamp DESC LIMIT 10;
+
+-- View sleep sessions
+SELECT * FROM sleep_sessions ORDER BY start_time DESC;
+
+-- Calculate average sleep duration
+SELECT AVG(duration_minutes) FROM sleep_sessions WHERE end_time IS NOT NULL;
+```
+
+## Project Customization Ideas
+
+This is a great foundation for learning AI/ML in production. Consider extending it with:
+
+1. **Machine Learning Enhancements**
+   - Train a custom cry detection model using TensorFlow Lite
+   - Add face detection to confirm baby's presence
+   - Implement pose estimation to detect positions (back, stomach, side)
+   - Activity classification (sleeping, awake, playing, crying)
+
+2. **Advanced Features**
+   - Temperature and humidity monitoring
+   - White noise player based on baby's state
+   - Sleep pattern predictions
+   - Multi-baby support
+   - Mobile app (React Native/Flutter)
+
+3. **Data Analysis**
+   - Sleep pattern visualization
+   - Correlation analysis (temperature vs. sleep quality)
+   - Export to CSV for external analysis
+   - Integration with baby tracking apps
+
+4. **Hardware Additions**
+   - Pan-tilt camera mount with servo control
+   - Night vision camera
+   - Multiple camera angles
+   - Smart light control
+
+## Performance Tips for Raspberry Pi
+
+1. **Optimize for Pi 3/4**
+```yaml
+camera:
+  resolution: [640, 480]  # or [320, 240] for Pi 3
+  fps: 5-10
+
+detection:
+  video:
+    check_interval: 3  # Check every 3 seconds
+  audio:
+    check_interval: 2
+```
+
+2. **Disable GUI** (headless mode)
+```bash
+sudo systemctl set-default multi-user.target
+```
+
+3. **Overclock** (optional, Pi 4)
+```bash
+sudo nano /boot/config.txt
+# Add: over_voltage=2, arm_freq=1750
+```
+
+## Contributing
+
+This is a personal project, but feel free to fork and customize for your needs!
+
+## License
+
+MIT License - feel free to use this for personal or commercial projects.
+
+## Safety Notice
+
+This baby monitor is a project for learning and should not replace proper baby safety equipment or monitoring practices. Always follow safe sleep guidelines and use in conjunction with standard baby monitoring practices.
+
+## Acknowledgments
+
+Built with:
+- OpenCV for computer vision
+- Flask for web interface
+- SQLAlchemy for database management
+- Various Python audio processing libraries
+
+## Support
+
+For issues or questions:
+1. Check the troubleshooting section above
+2. Review logs in `logs/baby_monitor.log`
+3. Test with verbose logging: Set `logging.level: DEBUG` in `config.yaml`
+
+---
+
+Built as a personal project to learn AI/ML in production environments. Perfect for demonstrating:
+- Real-time computer vision
+- Audio signal processing
+- Web application development
+- Database design
+- System integration
+- Deployment on edge devices (Raspberry Pi)
