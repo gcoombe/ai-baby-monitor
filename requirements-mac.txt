@@ -1,5 +1,5 @@
-# Requirements for Raspberry Pi
-# For macOS development, use: pip install -r requirements-mac.txt
+# Requirements for macOS development (Python 3.13+)
+# For Raspberry Pi deployment, use: pip install -r requirements.txt
 
 # Core dependencies
 opencv-python==4.12.0.88
@@ -10,9 +10,6 @@ pillow==12.0.0
 pyaudio==0.2.14
 scipy==1.16.3
 librosa==0.11.0
-
-# ML/AI for Raspberry Pi
-tflite-runtime==2.14.0
 
 # Web framework
 flask==3.1.2
