@@ -1,0 +1,10 @@
+---
+description: Project overview
+alwaysApply: true
+---
+
+# Project information
+
+This is a project to implement an ai powered baby monitor using a rasberry pi 5. It's features incluide:
+- Use video to detect when baby is asleep or awak
+- Use sounds to detect crying

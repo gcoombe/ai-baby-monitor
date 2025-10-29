@@ -12,7 +12,7 @@ import sys
 import urllib.request
 from pathlib import Path
 
-MODELS_DIR = Path("models")
+MODELS_DIR = Path("tf_models")
 MODELS_DIR.mkdir(exist_ok=True)
 
 MODELS = {

@@ -6,6 +6,7 @@ Detects baby's body keypoints to determine sleeping position and detect unsafe p
 import numpy as np
 import cv2
 import logging
+from abc import ABC, abstractmethod
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
@@ -18,7 +19,7 @@ except ImportError:
     TF_AVAILABLE = False
 
 
-class BabyPoseEstimator:
+class BabyPoseEstimator(ABC):
     """Estimate baby's pose using MoveNet for safety monitoring"""
 
     # 17 keypoints detected by MoveNet
@@ -48,7 +49,7 @@ class BabyPoseEstimator:
     LEFT_ANKLE = 15
     RIGHT_ANKLE = 16
 
-    def __init__(self, model_path='models/movenet_lightning.tflite'):
+    def __init__(self, model_path='tf_models/movenet_thunder.tflite'):
         """
         Initialize pose estimator.
 
@@ -120,9 +121,12 @@ class BabyPoseEstimator:
             logger.error(f"Error during pose prediction: {e}")
             return np.zeros((17, 3))
 
+    @abstractmethod
     def detect_sleeping_position(self, keypoints, confidence_threshold=0.3):
         """
         Determine baby's sleeping position from keypoints.
+        
+        This method should be implemented by subclasses based on camera configuration.
 
         Args:
             keypoints: Array of shape (17, 3) with [y, x, confidence]
@@ -133,55 +137,7 @@ class BabyPoseEstimator:
                 position: 'back', 'stomach', 'side_left', 'side_right', 'unknown'
                 confidence: Average confidence of detection
         """
-        # Extract key body parts
-        nose = keypoints[self.NOSE]
-        left_shoulder = keypoints[self.LEFT_SHOULDER]
-        right_shoulder = keypoints[self.RIGHT_SHOULDER]
-        left_hip = keypoints[self.LEFT_HIP]
-        right_hip = keypoints[self.RIGHT_HIP]
-
-        # Check if key points are visible enough
-        key_parts = [nose, left_shoulder, right_shoulder, left_hip, right_hip]
-        confidences = [kp[2] for kp in key_parts]
-        avg_confidence = np.mean(confidences)
-
-        if avg_confidence < confidence_threshold:
-            return 'unknown', avg_confidence
-
-        # Calculate shoulder width (in normalized coordinates 0-1)
-        shoulder_width = abs(left_shoulder[1] - right_shoulder[1])
-
-        # Calculate hip width
-        hip_width = abs(left_hip[1] - right_hip[1])
-
-        # Average body width
-        avg_width = (shoulder_width + hip_width) / 2
-
-        # Determine position based on visible keypoints and body width
-        nose_visible = nose[2] > confidence_threshold
-
-        if avg_width > 0.15:
-            # Wide shoulder/hip span - lying flat (back or stomach)
-            if nose_visible:
-                # Nose visible and wide body - lying on back (SAFE)
-                return 'back', avg_confidence
-            else:
-                # Nose not visible and wide body - likely face down (UNSAFE!)
-                return 'stomach', avg_confidence
-
-        elif avg_width > 0.05:
-            # Moderate span - lying on side
-            # Determine which side based on relative shoulder positions
-            shoulder_center = (left_shoulder[1] + right_shoulder[1]) / 2
-
-            if shoulder_center < 0.5:
-                return 'side_left', avg_confidence
-            else:
-                return 'side_right', avg_confidence
-
-        else:
-            # Very narrow or unclear
-            return 'unknown', avg_confidence
+        pass
 
     def is_unsafe_position(self, position):
         """
@@ -286,53 +242,3 @@ class BabyPoseEstimator:
             return keypoints[idx]
         except (ValueError, IndexError):
             return None
-
-
-# Example usage
-if __name__ == '__main__':
-    # Test pose estimator with webcam
-    import sys
-
-    try:
-        estimator = BabyPoseEstimator()
-    except Exception as e:
-        print(f"Failed to initialize: {e}")
-        print("Make sure you have downloaded the model.")
-        print("Run: python download_models.py")
-        sys.exit(1)
-
-    cap = cv2.VideoCapture(0)
-
-    print("Pose Estimation Test")
-    print("Press 'q' to quit")
-
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            break
-
-        # Run pose estimation
-        keypoints = estimator.predict(frame)
-
-        # Detect position
-        position, confidence = estimator.detect_sleeping_position(keypoints)
-
-        # Draw keypoints
-        annotated = estimator.draw_keypoints(frame, keypoints)
-
-        # Add text overlay
-        text = f"Position: {position} ({confidence:.2%})"
-        cv2.putText(annotated, text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX,
-                   1, (0, 255, 0), 2)
-
-        if estimator.is_unsafe_position(position):
-            cv2.putText(annotated, "UNSAFE POSITION!", (10, 70),
-                       cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-
-        cv2.imshow('Pose Estimation', annotated)
-
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
-
-    cap.release()
-    cv2.destroyAllWindows()

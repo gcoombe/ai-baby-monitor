@@ -28,10 +28,13 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 # Import baby monitor components
 try:
-    from models.pose_estimator import BabyPoseEstimator, TF_AVAILABLE
+    from models.pose_estimator import TF_AVAILABLE
+    from models.top_view_estimator import TopViewBabyPoseEstimator
+    from models.side_view_estimator import SideViewBabyPoseEstimator
 except ImportError:
     TF_AVAILABLE = False
-    BabyPoseEstimator = None
+    TopViewBabyPoseEstimator = None
+    SideViewBabyPoseEstimator = None
 
 logger = logging.getLogger(__name__)
 
@@ -102,6 +105,7 @@ class VideoTester:
             'awake_confirmation_time': 30,
             'sleep_confirmation_time': 300,
             'rotation': 0,
+            'camera_view': 'top',  # 'top' or 'side'
         }
 
     def initialize(self):
@@ -123,11 +127,16 @@ class VideoTester:
         logger.info(f"Duration: {self.results['video_duration']:.2f} seconds")
 
         # Initialize pose estimator if available
-        if TF_AVAILABLE and BabyPoseEstimator:
+        if TF_AVAILABLE and TopViewBabyPoseEstimator and SideViewBabyPoseEstimator:
             try:
-                self.pose_estimator = BabyPoseEstimator()
+                camera_view = self.config.get('camera_view', 'top').lower()
+                if camera_view == 'side':
+                    self.pose_estimator = SideViewBabyPoseEstimator()
+                    logger.info("Pose estimation enabled (Side View)")
+                else:
+                    self.pose_estimator = TopViewBabyPoseEstimator()
+                    logger.info("Pose estimation enabled (Top View)")
                 self.use_pose_estimation = True
-                logger.info("Pose estimation enabled")
             except Exception as e:
                 logger.warning(f"Could not initialize pose estimator: {e}")
                 self.use_pose_estimation = False
@@ -515,6 +524,8 @@ Examples:
   python test_video.py recording.mp4 --show-video
   python test_video.py recording.mp4 --save-output results.mp4 --report report.txt
   python test_video.py recording.mp4 --rotation 180
+  python test_video.py recording.mp4 --camera-view side
+  python test_video.py recording.mp4 --camera-view top --show-video
         """
     )
 
@@ -527,6 +538,8 @@ Examples:
                        help='Save analysis report to file (also creates JSON version)')
     parser.add_argument('--rotation', type=int, default=0, choices=[0, 90, 180, 270],
                        help='Rotate video (0, 90, 180, or 270 degrees)')
+    parser.add_argument('--camera-view', type=str, default='top', choices=['top', 'side'],
+                       help='Camera view configuration: top (above baby) or side (beside baby) (default: top)')
     parser.add_argument('--motion-threshold', type=int, default=25,
                        help='Motion detection sensitivity (default: 25)')
     parser.add_argument('--motion-min-area', type=int, default=500,
@@ -556,6 +569,7 @@ Examples:
         'motion_threshold': args.motion_threshold,
         'motion_min_area': args.motion_min_area,
         'rotation': args.rotation,
+        'camera_view': args.camera_view,
         'awake_confirmation_time': 30,
         'sleep_confirmation_time': 300,
     }

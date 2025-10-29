@@ -5,6 +5,7 @@ camera:
   resolution: [640, 480]
   fps: 10
   rotation: 0  # 0, 90, 180, or 270 degrees
+  view: "top"  # Camera view configuration: "top" (above baby) or "side" (beside baby)
 
 video_storage:
   enabled: false  # Enable/disable video recording
@@ -28,7 +29,7 @@ detection:
     motion_threshold: 25  # Sensitivity for motion detection (lower = more sensitive)
     motion_min_area: 500  # Minimum area in pixels to consider as motion
     awake_confidence_threshold: 0.7  # Confidence threshold for awake detection
-    check_interval: 2  # Seconds between checks
+    check_interval: 1  # Seconds between checks
 
   audio:
     cry_threshold: 0.6  # Confidence threshold for cry detection
@@ -55,6 +56,9 @@ notifications:
     baby_stirring: true
     cry_detected: true
     long_wake_period: true  # Alert if awake for extended period
+
+detect_unsafe_positions:
+  enabled: true
 
 database:
   path: "data/baby_monitor.db"
