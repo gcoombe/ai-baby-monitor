@@ -3,6 +3,7 @@
 
 # Core dependencies
 opencv-python==4.12.0.88
+opencv-stubs
 numpy==2.2.6
 pillow==12.0.0
 
@@ -27,3 +28,6 @@ pyyaml==6.0.3
 
 # Utilities
 python-dotenv==1.2.1
+
+
+tensorflow==2.20.0
