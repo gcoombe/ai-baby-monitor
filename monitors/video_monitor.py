@@ -7,6 +7,7 @@ import logging
 from threading import Thread, Event
 from datetime import datetime, timedelta
 import time
+from monitors.video_recorder import VideoRecorder
 
 logger = logging.getLogger(__name__)
 
@@ -66,6 +67,9 @@ class VideoMonitor:
         self.frame_buffer = []
         self.buffer_size = 10
 
+        # Initialize video recorder
+        self.video_recorder = VideoRecorder(config)
+
     def start(self):
         """Start video monitoring in a separate thread"""
         if self.running:
@@ -107,6 +111,9 @@ class VideoMonitor:
         if self.camera:
             self.camera.release()
 
+        # Stop video recorder
+        self.video_recorder.stop()
+
         logger.info("Video monitor stopped")
 
     def _monitor_loop(self):
@@ -142,6 +149,14 @@ class VideoMonitor:
                 self.frame_buffer.append(frame)
                 if len(self.frame_buffer) > self.buffer_size:
                     self.frame_buffer.pop(0)
+
+                # Process frame for recording
+                self.video_recorder.process_frame(
+                    frame,
+                    motion_detected=motion_detected,
+                    is_baby_awake=self.is_baby_awake,
+                    last_significant_motion=self.last_significant_motion
+                )
 
                 # Sleep to maintain check interval
                 time.sleep(self.check_interval)
@@ -286,5 +301,7 @@ class VideoMonitor:
             'running': self.running,
             'baby_awake': self.is_baby_awake,
             'last_motion': self.last_motion_time.isoformat() if self.last_motion_time else None,
-            'last_significant_motion': self.last_significant_motion.isoformat() if self.last_significant_motion else None
+            'last_significant_motion': self.last_significant_motion.isoformat() if self.last_significant_motion else None,
+            'recording': self.video_recorder.is_recording(),
+            'recording_path': self.video_recorder.get_current_recording_path()
         }

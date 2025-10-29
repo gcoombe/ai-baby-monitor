@@ -14,6 +14,7 @@ from dotenv import load_dotenv
 from database import DatabaseManager
 from notifiers import NotificationManager
 from monitors import VideoMonitor, AudioMonitor
+from monitors.recording_manager import RecordingManager
 
 # Load environment variables
 load_dotenv()
@@ -90,6 +91,13 @@ class BabyMonitor:
         self.video_monitor = VideoMonitor(config, self.db, self.notifier)
         self.audio_monitor = AudioMonitor(config, self.db, self.notifier)
 
+        # Initialize recording manager if video storage is enabled
+        self.recording_manager = None
+        if config.get('video_storage', {}).get('enabled', False):
+            storage_path = config['video_storage']['storage_path']
+            retention_days = config['video_storage']['retention_days']
+            self.recording_manager = RecordingManager(storage_path, retention_days)
+
         # Web interface
         self.web_app = None
         if config['web']['enabled']:
@@ -97,6 +105,7 @@ class BabyMonitor:
             self.web_app = create_app(self)
 
         self.running = False
+        self.cleanup_thread = None
 
     def start(self):
         """Start all monitoring components"""
@@ -114,6 +123,26 @@ class BabyMonitor:
             self.logger.warning("Audio monitor not started (may not be available)")
 
         self.running = True
+
+        # Start recording cleanup task if recording manager is enabled
+        if self.recording_manager:
+            from threading import Thread
+            import time
+
+            def cleanup_task():
+                """Periodic cleanup of old recordings"""
+                while self.running:
+                    # Run cleanup every 6 hours
+                    time.sleep(6 * 60 * 60)
+                    if self.running:
+                        self.logger.info("Running periodic recording cleanup...")
+                        deleted, freed = self.recording_manager.cleanup_old_recordings()
+                        if deleted > 0:
+                            self.logger.info(f"Cleanup: {deleted} files removed, {freed / 1024 / 1024:.2f} MB freed")
+
+            self.cleanup_thread = Thread(target=cleanup_task, daemon=True)
+            self.cleanup_thread.start()
+            self.logger.info("Recording cleanup task started")
 
         # Start web interface if enabled
         if self.web_app:

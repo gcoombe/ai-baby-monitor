@@ -6,6 +6,17 @@ camera:
   fps: 10
   rotation: 0  # 0, 90, 180, or 270 degrees
 
+video_storage:
+  enabled: false  # Enable/disable video recording
+  storage_path: "recordings"  # Directory to store recorded videos
+  recording_mode: "motion"  # Options: continuous, motion, event
+  segment_duration: 300  # Seconds per video file (5 minutes)
+  retention_days: 7  # Days to keep recordings (0 = keep forever)
+  quality: "medium"  # Options: low, medium, high
+  include_timestamp: true  # Add timestamp overlay to videos
+  pre_motion_buffer: 5  # Seconds of video before motion event
+  post_motion_duration: 10  # Seconds to record after motion stops
+
 audio:
   device_index: null  # null for default microphone
   sample_rate: 16000
