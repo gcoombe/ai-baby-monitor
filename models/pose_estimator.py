@@ -33,10 +33,20 @@ class BabyPoseEstimator:
     NOSE = 0
     LEFT_EYE = 1
     RIGHT_EYE = 2
+    LEFT_EAR = 3
+    RIGHT_EAR = 4
     LEFT_SHOULDER = 5
     RIGHT_SHOULDER = 6
+    LEFT_ELBOW = 7
+    RIGHT_ELBOW = 8
+    LEFT_WRIST = 9
+    RIGHT_WRIST = 10
     LEFT_HIP = 11
     RIGHT_HIP = 12
+    LEFT_KNEE = 13
+    RIGHT_KNEE = 14
+    LEFT_ANKLE = 15
+    RIGHT_ANKLE = 16
 
     def __init__(self, model_path='models/movenet_lightning.tflite'):
         """
@@ -150,13 +160,14 @@ class BabyPoseEstimator:
         # Determine position based on visible keypoints and body width
         nose_visible = nose[2] > confidence_threshold
 
-        if not nose_visible and avg_width < 0.1:
-            # Nose not visible and narrow body - likely face down (UNSAFE!)
-            return 'stomach', avg_confidence
-
-        elif avg_width > 0.15:
-            # Wide shoulder/hip span - lying on back
-            return 'back', avg_confidence
+        if avg_width > 0.15:
+            # Wide shoulder/hip span - lying flat (back or stomach)
+            if nose_visible:
+                # Nose visible and wide body - lying on back (SAFE)
+                return 'back', avg_confidence
+            else:
+                # Nose not visible and wide body - likely face down (UNSAFE!)
+                return 'stomach', avg_confidence
 
         elif avg_width > 0.05:
             # Moderate span - lying on side
@@ -213,14 +224,14 @@ class BabyPoseEstimator:
             (self.LEFT_HIP, self.RIGHT_HIP),
             # Arms
             (self.LEFT_SHOULDER, self.LEFT_ELBOW),
-            (self.LEFT_ELBOW, 9),  # left_wrist
-            (self.RIGHT_SHOULDER, 8),  # right_elbow
-            (8, 10),  # right_elbow to right_wrist
+            (self.LEFT_ELBOW, self.LEFT_WRIST),
+            (self.RIGHT_SHOULDER, self.RIGHT_ELBOW),
+            (self.RIGHT_ELBOW, self.RIGHT_WRIST),
             # Legs
-            (self.LEFT_HIP, 13),  # left_knee
-            (13, 15),  # left_knee to left_ankle
-            (self.RIGHT_HIP, 14),  # right_knee
-            (14, 16),  # right_knee to right_ankle
+            (self.LEFT_HIP, self.LEFT_KNEE),
+            (self.LEFT_KNEE, self.LEFT_ANKLE),
+            (self.RIGHT_HIP, self.RIGHT_KNEE),
+            (self.RIGHT_KNEE, self.RIGHT_ANKLE),
         ]
 
         # Draw connections (skeleton)
@@ -251,6 +262,11 @@ class BabyPoseEstimator:
 
                 cv2.circle(annotated, (x_coord, y_coord), 5, color, -1)
                 cv2.circle(annotated, (x_coord, y_coord), 7, (255, 255, 255), 2)
+                
+                # Add keypoint label
+                label = self.KEYPOINT_NAMES[i]
+                cv2.putText(annotated, label, (x_coord + 10, y_coord - 10),
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1, cv2.LINE_AA)
 
         return annotated
 
