@@ -16,25 +16,6 @@ An intelligent baby monitoring system that uses computer vision and audio proces
 - **Event Logging**: Complete history of all events and sleep sessions
 - **Configurable**: Highly customizable detection thresholds and notification preferences
 
-## Architecture
-
-```
-ai-baby-monitor/
-├── main.py                 # Main application entry point
-├── config.yaml            # Configuration file
-├── requirements.txt       # Python dependencies
-├── database/
-│   └── db_manager.py     # SQLite database management
-├── monitors/
-│   ├── video_monitor.py  # Video processing and motion detection
-│   └── audio_monitor.py  # Audio processing and cry detection
-├── notifiers/
-│   └── notification_manager.py  # Multi-channel notifications
-└── web/
-    ├── app.py            # Flask web server
-    └── templates/
-        └── index.html    # Web dashboard
-```
 
 ## Hardware Requirements
 
@@ -80,8 +61,7 @@ sudo apt-get install -y python3-pip python3-dev
 
 3. **Clone or download this project**
 ```bash
-cd ~
-git clone <your-repo-url> ai-baby-monitor
+git clone git@github.com:gcoombe/ai-baby-monitor.git ai-baby-monitor
 cd ai-baby-monitor
 ```
 
@@ -96,7 +76,7 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### On Desktop/Laptop
+### On Desktop/Laptop (mac)
 
 1. **Install Python 3.8+**
 
@@ -110,11 +90,7 @@ cd ai-baby-monitor
 ```bash
 python -m venv venv
 
-# On Linux/Mac:
 source venv/bin/activate
-
-# On Windows:
-venv\Scripts\activate
 ```
 
 4. **Install dependencies**
@@ -160,9 +136,7 @@ Key settings to adjust:
 
 1. **Activate virtual environment**
 ```bash
-source venv/bin/activate  # On Linux/Mac
-# or
-venv\Scripts\activate  # On Windows
+source venv/bin/activate  
 ```
 
 2. **Run the monitor**
@@ -200,8 +174,6 @@ python test_video.py your_video.mp4 --show-video
 # Save annotated video with all detections visualized
 python test_video.py your_video.mp4 --save-output annotated.mp4 --report report.txt
 
-# Use the example script for automated testing
-./example_test.sh your_video.mp4
 ```
 
 The test script provides:
@@ -378,34 +350,6 @@ SELECT * FROM sleep_sessions ORDER BY start_time DESC;
 SELECT AVG(duration_minutes) FROM sleep_sessions WHERE end_time IS NOT NULL;
 ```
 
-## Project Customization Ideas
-
-This is a great foundation for learning AI/ML in production. Consider extending it with:
-
-1. **Machine Learning Enhancements**
-   - Train a custom cry detection model using TensorFlow Lite
-   - Add face detection to confirm baby's presence
-   - Implement pose estimation to detect positions (back, stomach, side)
-   - Activity classification (sleeping, awake, playing, crying)
-
-2. **Advanced Features**
-   - Temperature and humidity monitoring
-   - White noise player based on baby's state
-   - Sleep pattern predictions
-   - Multi-baby support
-   - Mobile app (React Native/Flutter)
-
-3. **Data Analysis**
-   - Sleep pattern visualization
-   - Correlation analysis (temperature vs. sleep quality)
-   - Export to CSV for external analysis
-   - Integration with baby tracking apps
-
-4. **Hardware Additions**
-   - Pan-tilt camera mount with servo control
-   - Night vision camera
-   - Multiple camera angles
-   - Smart light control
 
 ## Performance Tips for Raspberry Pi
 
@@ -433,39 +377,7 @@ sudo nano /boot/config.txt
 # Add: over_voltage=2, arm_freq=1750
 ```
 
-## Contributing
-
-This is a personal project, but feel free to fork and customize for your needs!
 
 ## License
 
 MIT License - feel free to use this for personal or commercial projects.
-
-## Safety Notice
-
-This baby monitor is a project for learning and should not replace proper baby safety equipment or monitoring practices. Always follow safe sleep guidelines and use in conjunction with standard baby monitoring practices.
-
-## Acknowledgments
-
-Built with:
-- OpenCV for computer vision
-- Flask for web interface
-- SQLAlchemy for database management
-- Various Python audio processing libraries
-
-## Support
-
-For issues or questions:
-1. Check the troubleshooting section above
-2. Review logs in `logs/baby_monitor.log`
-3. Test with verbose logging: Set `logging.level: DEBUG` in `config.yaml`
-
----
-
-Built as a personal project to learn AI/ML in production environments. Perfect for demonstrating:
-- Real-time computer vision
-- Audio signal processing
-- Web application development
-- Database design
-- System integration
-- Deployment on edge devices (Raspberry Pi)
