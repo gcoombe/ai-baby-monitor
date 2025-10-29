@@ -531,6 +531,8 @@ Examples:
                        help='Motion detection sensitivity (default: 25)')
     parser.add_argument('--motion-min-area', type=int, default=500,
                        help='Minimum motion area in pixels (default: 500)')
+    parser.add_argument('--awake_confirmation_time', type=int, default=30,
+                       help='Duration of continuous activity to confirm awake (default: 30)')
     parser.add_argument('--log-level', default='INFO',
                        choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'],
                        help='Logging level (default: INFO)')
