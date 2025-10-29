@@ -186,6 +186,39 @@ To find your Raspberry Pi IP:
 hostname -I
 ```
 
+### Testing with Recorded Videos
+
+Before running the monitor live, you can test the algorithm on pre-recorded video files:
+
+```bash
+# Basic test - generates a text report
+python test_video.py your_video.mp4 --report analysis.txt
+
+# Watch the video with detection overlays
+python test_video.py your_video.mp4 --show-video
+
+# Save annotated video with all detections visualized
+python test_video.py your_video.mp4 --save-output annotated.mp4 --report report.txt
+
+# Use the example script for automated testing
+./example_test.sh your_video.mp4
+```
+
+The test script provides:
+- **Motion detection analysis** - Shows when and how much movement was detected
+- **Sleep/wake state tracking** - Identifies when baby appears awake or asleep
+- **Position detection** (if TensorFlow installed) - Identifies sleeping positions and unsafe positions
+- **Annotated video output** - Visual overlay showing all detections
+- **Detailed reports** - Text and JSON reports with statistics and timeline
+
+This is useful for:
+- Testing the algorithm before live deployment
+- Tuning detection sensitivity settings
+- Reviewing past recordings
+- Validating detection accuracy
+
+See `TEST_VIDEO_GUIDE.md` for complete documentation.
+
 ### Running as a System Service (Raspberry Pi)
 
 To run the monitor automatically on startup:
