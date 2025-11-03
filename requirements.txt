@@ -1,18 +1,25 @@
 # Requirements for Raspberry Pi
 # For macOS development, use: pip install -r requirements-mac.txt
+# Recommended: Python 3.9-3.12 (Python 3.13 has limited ARM64 package support)
 
 # Core dependencies
 opencv-python==4.12.0.88
 numpy==2.2.6
 pillow==12.0.0
 
+# Raspberry Pi camera support (for libcamera systems)
+picamera2
+
 # Audio processing
 pyaudio==0.2.14
 scipy==1.16.3
 librosa==0.11.0
 
-# ML/AI for Raspberry Pi
-tflite-runtime==2.14.0
+# ML/AI for Raspberry Pi (OPTIONAL - for pose estimation feature)
+# Install separately: pip install --extra-index-url https://google-coral.github.io/py-repo/ tflite_runtime
+# OR use full TensorFlow: pip install tensorflow==2.16.1
+# tflite-runtime==2.14.0
+
 
 # Web framework
 flask==3.1.2
