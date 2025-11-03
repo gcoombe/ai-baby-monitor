@@ -35,7 +35,7 @@ class VideoMonitor:
         self.rotation = config['camera']['rotation']
 
         # Detection settings
-        self.motion_threshold = config['detection']['video']['motion_threshold']
+        self.motion_threshold = config['detection']['video']['motion_threshold']    
         self.motion_min_area = config['detection']['video']['motion_min_area']
         self.awake_threshold = config['detection']['video']['awake_confidence_threshold']
         self.check_interval = config['detection']['video']['check_interval']
@@ -77,16 +77,53 @@ class VideoMonitor:
             return
 
         logger.info("Starting video monitor...")
-        self.camera = cv2.VideoCapture(self.device)
+        
+        # Try different backends for Raspberry Pi compatibility
+        backends = [
+            (cv2.CAP_V4L2, "V4L2"),
+            (cv2.CAP_ANY, "ANY"),
+            (None, "default")
+        ]
+        
+        for backend, backend_name in backends:
+            try:
+                logger.info(f"Trying to open camera with {backend_name} backend...")
+                if backend is not None:
+                    self.camera = cv2.VideoCapture(self.device, backend)
+                else:
+                    self.camera = cv2.VideoCapture(self.device)
+                
+                if self.camera.isOpened():
+                    # Try to read a test frame
+                    ret, _ = self.camera.read()
+                    if ret:
+                        logger.info(f"Successfully opened camera with {backend_name} backend")
+                        break
+                    else:
+                        logger.warning(f"Camera opened but failed to read frame with {backend_name} backend")
+                        self.camera.release()
+                        self.camera = None
+                else:
+                    logger.warning(f"Failed to open camera with {backend_name} backend")
+                    self.camera = None
+            except Exception as e:
+                logger.warning(f"Exception with {backend_name} backend: {e}")
+                self.camera = None
 
-        if not self.camera.isOpened():
-            logger.error("Failed to open camera")
+        if not self.camera or not self.camera.isOpened():
+            logger.error("Failed to open camera with any backend")
             return False
 
         # Set camera properties
         self.camera.set(cv2.CAP_PROP_FRAME_WIDTH, self.resolution[0])
         self.camera.set(cv2.CAP_PROP_FRAME_HEIGHT, self.resolution[1])
         self.camera.set(cv2.CAP_PROP_FPS, self.fps)
+        
+        # Log actual camera properties
+        actual_width = self.camera.get(cv2.CAP_PROP_FRAME_WIDTH)
+        actual_height = self.camera.get(cv2.CAP_PROP_FRAME_HEIGHT)
+        actual_fps = self.camera.get(cv2.CAP_PROP_FPS)
+        logger.info(f"Camera properties: {actual_width}x{actual_height} @ {actual_fps}fps")
 
         self.running = True
         self.stop_event.clear()
