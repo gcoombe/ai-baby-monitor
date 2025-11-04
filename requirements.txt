@@ -1,39 +1,37 @@
-# Requirements for Raspberry Pi
+# Requirements for Raspberry Pi (Python 3.13 compatible)
 # For macOS development, use: pip install -r requirements-mac.txt
-# Recommended: Python 3.9-3.12 (Python 3.13 has limited ARM64 package support)
 
 # Core dependencies
-opencv-python==4.12.0.88
-numpy==2.2.6
-pillow==12.0.0
+opencv-python~=4.8.0
+numpy~=1.24.0
+pillow~=10.0.0
 
 # Raspberry Pi camera support (for libcamera systems)
-picamera2
+# Note: Install system package: sudo apt install python3-picamera2
+# Then create venv with: python3 -m venv --system-site-packages venv
+# picamera2  # Must use system package, not pip
 
 # Audio processing
-pyaudio==0.2.14
-scipy==1.16.3
-librosa==0.11.0
-
-# ML/AI for Raspberry Pi (OPTIONAL - for pose estimation feature)
-# Install separately: pip install --extra-index-url https://google-coral.github.io/py-repo/ tflite_runtime
-# OR use full TensorFlow: pip install tensorflow==2.16.1
-# tflite-runtime==2.14.0
-
+pyaudio~=0.2.13
+scipy~=1.11.0
+librosa~=0.10.0
 
 # Web framework
-flask==3.1.2
-flask-cors==6.0.1
+flask~=3.0.0
+flask-cors~=4.0.0
 
 # Database
-sqlalchemy==2.0.44
+sqlalchemy~=2.0.0
 
 # Notifications
-requests==2.32.5
-pushbullet.py==0.12.0
+requests~=2.31.0
+pushbullet.py~=0.12.0
 
 # Configuration
-pyyaml==6.0.3
+pyyaml~=6.0
 
 # Utilities
-python-dotenv==1.2.1
+python-dotenv~=1.0.0
+
+# TensorFlow for pose estimation (optional - install manually if needed)
+# tensorflow~=2.15.0  # May not be available for Python 3.13 yet
