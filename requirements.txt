@@ -1,10 +1,10 @@
 # Requirements for Raspberry Pi (Python 3.13 compatible)
 # For macOS development, use: pip install -r requirements-mac.txt
 
-# Core dependencies
-opencv-python~=4.8.0
-numpy~=1.24.0
-pillow~=10.0.0
+# Core dependencies (Python 3.13 requires newer versions with pre-built wheels)
+opencv-python~=4.10.0
+numpy~=2.0.0
+pillow~=11.0.0
 
 # Raspberry Pi camera support (for libcamera systems)
 # Note: Install system package: sudo apt install python3-picamera2
@@ -12,8 +12,8 @@ pillow~=10.0.0
 # picamera2  # Must use system package, not pip
 
 # Audio processing
-pyaudio~=0.2.13
-scipy~=1.11.0
+pyaudio~=0.2.14
+scipy~=1.14.0
 librosa~=0.10.0
 
 # Web framework
@@ -24,7 +24,7 @@ flask-cors~=4.0.0
 sqlalchemy~=2.0.0
 
 # Notifications
-requests~=2.31.0
+requests~=2.32.0
 pushbullet.py~=0.12.0
 
 # Configuration
