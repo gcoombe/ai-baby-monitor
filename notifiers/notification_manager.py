@@ -186,3 +186,12 @@ class NotificationManager:
         title = "Extended Wake Period"
         message = f"Your baby has been awake for {duration_minutes:.0f} minutes."
         return self.send_notification(title, message, 'long_wake_period')
+
+    def notify_unsafe_position(self, position, confidence=None):
+        """Send notification about unsafe sleeping position"""
+        title = "⚠️ UNSAFE SLEEPING POSITION!"
+        message = f"Baby detected in unsafe sleeping position: {position.upper()}"
+        if confidence:
+            message += f"\nConfidence: {confidence:.0%}"
+        message += "\n\nPlease check on your baby immediately."
+        return self.send_notification(title, message, 'unsafe_position')

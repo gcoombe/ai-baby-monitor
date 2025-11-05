@@ -11,6 +11,16 @@ import time
 from monitors.video_recorder import VideoRecorder
 from picamera2 import Picamera2
 
+# Import pose estimation
+try:
+    from models.pose_estimator import TF_AVAILABLE
+    from models.top_view_estimator import TopViewBabyPoseEstimator
+    from models.side_view_estimator import SideViewBabyPoseEstimator
+except ImportError:
+    TF_AVAILABLE = False
+    TopViewBabyPoseEstimator = None
+    SideViewBabyPoseEstimator = None
+
 logger = logging.getLogger(__name__)
 
 
@@ -67,6 +77,32 @@ class VideoMonitor:
         # Frame buffer for awake detection
         self.frame_buffer = []
         self.buffer_size = 10
+
+        # Pose estimation
+        self.pose_estimator = None
+        self.use_pose_estimation = False
+        self.unsafe_position_enabled = config.get('detect_unsafe_positions', {}).get('enabled', True)
+        self.current_position = None
+        self.current_position_confidence = 0.0
+        self.last_unsafe_position_alert = None
+        self.unsafe_position_alert_cooldown = 60  # seconds between alerts
+        
+        # Initialize pose estimator if available
+        if TF_AVAILABLE and TopViewBabyPoseEstimator and SideViewBabyPoseEstimator:
+            try:
+                camera_view = config['camera'].get('view', 'top').lower()
+                if camera_view == 'side':
+                    self.pose_estimator = SideViewBabyPoseEstimator()
+                    logger.info("Pose estimation enabled (Side View)")
+                else:
+                    self.pose_estimator = TopViewBabyPoseEstimator()
+                    logger.info("Pose estimation enabled (Top View)")
+                self.use_pose_estimation = True
+            except Exception as e:
+                logger.warning(f"Could not initialize pose estimator: {e}")
+                self.use_pose_estimation = False
+        else:
+            logger.warning("TensorFlow not available - pose estimation disabled")
 
         # Initialize video recorder
         self.video_recorder = VideoRecorder(config)
@@ -170,6 +206,26 @@ class VideoMonitor:
                 # Check sleep/wake state
                 self._update_sleep_state()
 
+                # Pose estimation and position detection
+                keypoints = None
+                position = None
+                position_confidence = 0.0
+                
+                if self.use_pose_estimation and self.pose_estimator:
+                    try:
+                        keypoints = self.pose_estimator.predict(frame)
+                        position, position_confidence = self.pose_estimator.detect_sleeping_position(keypoints)
+                        
+                        # Update current position
+                        self.current_position = position
+                        self.current_position_confidence = position_confidence
+                        
+                        # Check for unsafe position
+                        if self.unsafe_position_enabled and position != 'unknown':
+                            self._handle_unsafe_position(position, position_confidence)
+                    except Exception as e:
+                        logger.error(f"Error in pose estimation: {e}")
+
                 # Store frame in buffer for advanced detection
                 self.frame_buffer.append(frame)
                 if len(self.frame_buffer) > self.buffer_size:
@@ -182,7 +238,11 @@ class VideoMonitor:
                     is_baby_awake=self.is_baby_awake,
                     last_significant_motion=self.last_significant_motion,
                     motion_level=motion_level,
-                    contours=contours
+                    contours=contours,
+                    keypoints=keypoints,
+                    position=position,
+                    position_confidence=position_confidence,
+                    pose_estimator=self.pose_estimator
                 )
 
               
@@ -249,6 +309,33 @@ class VideoMonitor:
             # Check if we should notify
             if confidence > 0.7:
                 self.notifier.notify_baby_stirring(confidence)
+
+    def _handle_unsafe_position(self, position, confidence):
+        """
+        Handle unsafe sleeping position detection.
+
+        Args:
+            position: Detected sleeping position
+            confidence: Confidence of detection
+        """
+        now = datetime.now()
+        
+        # Check if position is unsafe
+        if self.pose_estimator.is_unsafe_position(position):
+            # Log the event
+            self.db.log_event('unsafe_position', confidence=confidence, 
+                            metadata={'position': position})
+            
+            # Send notification if cooldown period has passed
+            should_notify = (
+                self.last_unsafe_position_alert is None or
+                (now - self.last_unsafe_position_alert).total_seconds() > self.unsafe_position_alert_cooldown
+            )
+            
+            if should_notify:
+                logger.warning(f"Unsafe sleeping position detected: {position} (confidence: {confidence:.2f})")
+                self.notifier.notify_unsafe_position(position, confidence)
+                self.last_unsafe_position_alert = now
 
     def _update_sleep_state(self):
         """Update the baby's sleep/wake state based on recent activity"""
@@ -330,5 +417,8 @@ class VideoMonitor:
             'last_significant_motion': self.last_significant_motion.isoformat() if self.last_significant_motion else None,
             'recording': self.video_recorder.is_recording(),
             'recording_path_annotated': recording_paths['annotated'],
-            'recording_path_raw': recording_paths['raw']
+            'recording_path_raw': recording_paths['raw'],
+            'pose_estimation_enabled': self.use_pose_estimation,
+            'current_position': self.current_position,
+            'position_confidence': self.current_position_confidence
         }
