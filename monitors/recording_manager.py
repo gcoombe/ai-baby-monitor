@@ -29,6 +29,7 @@ class RecordingManager:
     def cleanup_old_recordings(self):
         """
         Delete recordings older than retention period.
+        Handles both annotated and raw recordings.
 
         Returns:
             tuple: (number of files deleted, bytes freed)
@@ -42,19 +43,21 @@ class RecordingManager:
         bytes_freed = 0
 
         try:
-            for file_path in Path(self.storage_path).glob("recording_*.mp4"):
-                # Get file modification time
-                file_mtime = datetime.fromtimestamp(file_path.stat().st_mtime)
+            # Match both annotated and raw recording files
+            for pattern in ["recording_*_annotated.mp4", "recording_*_raw.mp4", "recording_*.mp4"]:
+                for file_path in Path(self.storage_path).glob(pattern):
+                    # Get file modification time
+                    file_mtime = datetime.fromtimestamp(file_path.stat().st_mtime)
 
-                if file_mtime < cutoff_time:
-                    file_size = file_path.stat().st_size
-                    try:
-                        file_path.unlink()
-                        files_deleted += 1
-                        bytes_freed += file_size
-                        logger.info(f"Deleted old recording: {file_path.name}")
-                    except OSError as e:
-                        logger.error(f"Failed to delete {file_path.name}: {e}")
+                    if file_mtime < cutoff_time:
+                        file_size = file_path.stat().st_size
+                        try:
+                            file_path.unlink()
+                            files_deleted += 1
+                            bytes_freed += file_size
+                            logger.info(f"Deleted old recording: {file_path.name}")
+                        except OSError as e:
+                            logger.error(f"Failed to delete {file_path.name}: {e}")
 
         except Exception as e:
             logger.error(f"Error during cleanup: {e}")
@@ -67,6 +70,7 @@ class RecordingManager:
     def list_recordings(self, limit=None, sort_by='date', ascending=False):
         """
         List available recordings.
+        Handles both annotated and raw recordings.
 
         Args:
             limit: Maximum number of recordings to return (None = all)
@@ -79,16 +83,30 @@ class RecordingManager:
         recordings = []
 
         try:
-            for file_path in Path(self.storage_path).glob("recording_*.mp4"):
-                stat = file_path.stat()
-                recordings.append({
-                    'filename': file_path.name,
-                    'path': str(file_path),
-                    'size': stat.st_size,
-                    'created': datetime.fromtimestamp(stat.st_ctime),
-                    'modified': datetime.fromtimestamp(stat.st_mtime),
-                    'age_days': (datetime.now() - datetime.fromtimestamp(stat.st_mtime)).days
-                })
+            # Match both annotated and raw recording files, plus legacy files
+            for pattern in ["recording_*_annotated.mp4", "recording_*_raw.mp4", "recording_*.mp4"]:
+                for file_path in Path(self.storage_path).glob(pattern):
+                    # Skip files that match more specific patterns when using the generic pattern
+                    if pattern == "recording_*.mp4" and ("_annotated.mp4" in file_path.name or "_raw.mp4" in file_path.name):
+                        continue
+                    
+                    stat = file_path.stat()
+                    # Determine recording type
+                    recording_type = 'legacy'
+                    if '_annotated.mp4' in file_path.name:
+                        recording_type = 'annotated'
+                    elif '_raw.mp4' in file_path.name:
+                        recording_type = 'raw'
+                    
+                    recordings.append({
+                        'filename': file_path.name,
+                        'path': str(file_path),
+                        'type': recording_type,
+                        'size': stat.st_size,
+                        'created': datetime.fromtimestamp(stat.st_ctime),
+                        'modified': datetime.fromtimestamp(stat.st_mtime),
+                        'age_days': (datetime.now() - datetime.fromtimestamp(stat.st_mtime)).days
+                    })
 
         except Exception as e:
             logger.error(f"Error listing recordings: {e}")
@@ -110,6 +128,7 @@ class RecordingManager:
     def get_storage_stats(self):
         """
         Get storage statistics for recordings.
+        Includes breakdown by recording type (annotated/raw).
 
         Returns:
             dict: Storage statistics
@@ -118,18 +137,38 @@ class RecordingManager:
         file_count = 0
         oldest_file = None
         newest_file = None
+        annotated_count = 0
+        raw_count = 0
+        legacy_count = 0
+        annotated_size = 0
+        raw_size = 0
 
         try:
-            for file_path in Path(self.storage_path).glob("recording_*.mp4"):
-                stat = file_path.stat()
-                total_size += stat.st_size
-                file_count += 1
+            for pattern in ["recording_*_annotated.mp4", "recording_*_raw.mp4", "recording_*.mp4"]:
+                for file_path in Path(self.storage_path).glob(pattern):
+                    # Skip files that match more specific patterns when using the generic pattern
+                    if pattern == "recording_*.mp4" and ("_annotated.mp4" in file_path.name or "_raw.mp4" in file_path.name):
+                        continue
+                    
+                    stat = file_path.stat()
+                    total_size += stat.st_size
+                    file_count += 1
 
-                file_mtime = datetime.fromtimestamp(stat.st_mtime)
-                if oldest_file is None or file_mtime < oldest_file:
-                    oldest_file = file_mtime
-                if newest_file is None or file_mtime > newest_file:
-                    newest_file = file_mtime
+                    # Track by type
+                    if '_annotated.mp4' in file_path.name:
+                        annotated_count += 1
+                        annotated_size += stat.st_size
+                    elif '_raw.mp4' in file_path.name:
+                        raw_count += 1
+                        raw_size += stat.st_size
+                    else:
+                        legacy_count += 1
+
+                    file_mtime = datetime.fromtimestamp(stat.st_mtime)
+                    if oldest_file is None or file_mtime < oldest_file:
+                        oldest_file = file_mtime
+                    if newest_file is None or file_mtime > newest_file:
+                        newest_file = file_mtime
 
         except Exception as e:
             logger.error(f"Error getting storage stats: {e}")
@@ -139,6 +178,11 @@ class RecordingManager:
             'total_size_bytes': total_size,
             'total_size_mb': total_size / 1024 / 1024,
             'total_size_gb': total_size / 1024 / 1024 / 1024,
+            'annotated_files': annotated_count,
+            'annotated_size_mb': annotated_size / 1024 / 1024,
+            'raw_files': raw_count,
+            'raw_size_mb': raw_size / 1024 / 1024,
+            'legacy_files': legacy_count,
             'oldest_recording': oldest_file.isoformat() if oldest_file else None,
             'newest_recording': newest_file.isoformat() if newest_file else None,
             'storage_path': self.storage_path
@@ -147,6 +191,7 @@ class RecordingManager:
     def delete_recording(self, filename):
         """
         Delete a specific recording.
+        Handles annotated, raw, and legacy recording files.
 
         Args:
             filename: Name of the recording file to delete
@@ -161,8 +206,11 @@ class RecordingManager:
             logger.error(f"Invalid filename: {filename}")
             return False
 
-        # Ensure it's a recording file
-        if not filename.startswith('recording_') or not filename.endswith('.mp4'):
+        # Ensure it's a recording file (annotated, raw, or legacy)
+        valid_suffixes = ['_annotated.mp4', '_raw.mp4', '.mp4']
+        is_valid = filename.startswith('recording_') and any(filename.endswith(suffix) for suffix in valid_suffixes)
+        
+        if not is_valid:
             logger.error(f"Not a recording file: {filename}")
             return False
 

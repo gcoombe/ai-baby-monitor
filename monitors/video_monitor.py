@@ -322,11 +322,13 @@ class VideoMonitor:
 
     def get_status(self):
         """Get current monitoring status"""
+        recording_paths = self.video_recorder.get_current_recording_path()
         return {
             'running': self.running,
             'baby_awake': self.is_baby_awake,
             'last_motion': self.last_motion_time.isoformat() if self.last_motion_time else None,
             'last_significant_motion': self.last_significant_motion.isoformat() if self.last_significant_motion else None,
             'recording': self.video_recorder.is_recording(),
-            'recording_path': self.video_recorder.get_current_recording_path()
+            'recording_path_annotated': recording_paths['annotated'],
+            'recording_path_raw': recording_paths['raw']
         }

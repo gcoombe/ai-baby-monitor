@@ -32,7 +32,8 @@ class VideoRecorder:
         self.segment_duration = storage_config.get('segment_duration', 300)
         self.quality = storage_config.get('quality', 'medium')
         self.include_timestamp = storage_config.get('include_timestamp', True)
-        self.include_annotations = storage_config.get('include_annotations', True)
+        self.save_annotated = storage_config.get('save_annotated', True)
+        self.save_raw = storage_config.get('save_raw', False)
         self.pre_motion_buffer_size = storage_config.get('pre_motion_buffer', 5)
         self.post_motion_duration = storage_config.get('post_motion_duration', 10)
 
@@ -41,10 +42,12 @@ class VideoRecorder:
         self.fps = camera_config.get('fps', 10)
 
         # Recording state
-        self.video_writer = None
+        self.video_writer_annotated = None
+        self.video_writer_raw = None
         self.recording = False
         self.current_segment_start = None
-        self.current_recording_path = None
+        self.current_recording_path_annotated = None
+        self.current_recording_path_raw = None
         self.pre_motion_frames = deque(maxlen=self.pre_motion_buffer_size * self.fps)
         self.post_motion_frames_remaining = 0
         
@@ -197,43 +200,78 @@ class VideoRecorder:
         Args:
             start_time: Start time for the recording (defaults to now)
         """
-        if self.video_writer is not None:
+        if self.video_writer_annotated is not None or self.video_writer_raw is not None:
             self._stop_recording()
 
         if start_time is None:
             start_time = datetime.now()
 
-        # Generate filename with timestamp
+        # Generate base filename with timestamp
         timestamp = start_time.strftime('%Y%m%d_%H%M%S')
-        filename = f"recording_{timestamp}.mp4"
-        self.current_recording_path = os.path.join(self.storage_path, filename)
-
-        # Get codec and create video writer
+        
+        # Get codec
         fourcc, _ = self._get_video_codec()
-        self.video_writer = cv2.VideoWriter(
-            self.current_recording_path,
-            fourcc,
-            self.fps,
-            self.resolution
-        )
-
-        if self.video_writer.isOpened():
+        
+        # Create annotated video writer if enabled
+        if self.save_annotated:
+            filename_annotated = f"recording_{timestamp}_annotated.mp4"
+            self.current_recording_path_annotated = os.path.join(self.storage_path, filename_annotated)
+            
+            self.video_writer_annotated = cv2.VideoWriter(
+                self.current_recording_path_annotated,
+                fourcc,
+                self.fps,
+                self.resolution
+            )
+            
+            if self.video_writer_annotated.isOpened():
+                logger.info(f"Started annotated recording: {self.current_recording_path_annotated}")
+            else:
+                logger.error(f"Failed to start annotated video recording: {self.current_recording_path_annotated}")
+                self.video_writer_annotated = None
+        
+        # Create raw video writer if enabled
+        if self.save_raw:
+            filename_raw = f"recording_{timestamp}_raw.mp4"
+            self.current_recording_path_raw = os.path.join(self.storage_path, filename_raw)
+            
+            self.video_writer_raw = cv2.VideoWriter(
+                self.current_recording_path_raw,
+                fourcc,
+                self.fps,
+                self.resolution
+            )
+            
+            if self.video_writer_raw.isOpened():
+                logger.info(f"Started raw recording: {self.current_recording_path_raw}")
+            else:
+                logger.error(f"Failed to start raw video recording: {self.current_recording_path_raw}")
+                self.video_writer_raw = None
+        
+        # Set recording state if at least one writer was opened successfully
+        if (self.save_annotated and self.video_writer_annotated) or (self.save_raw and self.video_writer_raw):
             self.recording = True
             self.current_segment_start = start_time
-            logger.info(f"Started recording: {self.current_recording_path}")
         else:
-            logger.error(f"Failed to start video recording: {self.current_recording_path}")
-            self.video_writer = None
+            logger.error("Failed to start any video recording")
+            self._stop_recording()
 
     def _stop_recording(self):
         """Stop current video recording."""
-        if self.video_writer is not None:
-            self.video_writer.release()
-            self.video_writer = None
-            self.recording = False
-            logger.info(f"Stopped recording: {self.current_recording_path}")
-            self.current_recording_path = None
-            self.current_segment_start = None
+        if self.video_writer_annotated is not None:
+            self.video_writer_annotated.release()
+            self.video_writer_annotated = None
+            logger.info(f"Stopped annotated recording: {self.current_recording_path_annotated}")
+            self.current_recording_path_annotated = None
+        
+        if self.video_writer_raw is not None:
+            self.video_writer_raw.release()
+            self.video_writer_raw = None
+            logger.info(f"Stopped raw recording: {self.current_recording_path_raw}")
+            self.current_recording_path_raw = None
+        
+        self.recording = False
+        self.current_segment_start = None
 
     def _get_video_codec(self):
         """
@@ -290,24 +328,35 @@ class VideoRecorder:
 
     def _write_frame(self, frame, frame_data=None):
         """
-        Write frame to video file.
+        Write frame to video file(s).
 
         Args:
             frame: Video frame to write
             frame_data: Optional dict with annotation data (motion_level, contours, etc.)
         """
-        if self.video_writer is not None and self.recording:
-            # Apply annotations if enabled
-            if self.include_annotations:
-                if frame_data is None:
-                    frame_data = self.current_frame_data
-                frame_to_write = self._add_annotations(frame, frame_data)
-            else:
-                frame_to_write = frame.copy()
+        if not self.recording:
+            return
+        
+        # Write annotated video if enabled
+        if self.video_writer_annotated is not None:
+            if frame_data is None:
+                frame_data = self.current_frame_data
+            
+            # Apply annotations
+            frame_annotated = self._add_annotations(frame, frame_data)
             
             # Add timestamp overlay
-            frame_to_write = self._add_timestamp_overlay(frame_to_write)
-            self.video_writer.write(frame_to_write)
+            frame_annotated = self._add_timestamp_overlay(frame_annotated)
+            
+            self.video_writer_annotated.write(frame_annotated)
+        
+        # Write raw video if enabled
+        if self.video_writer_raw is not None:
+            # Only add timestamp to raw video, no annotations
+            frame_raw = frame.copy()
+            frame_raw = self._add_timestamp_overlay(frame_raw)
+            
+            self.video_writer_raw.write(frame_raw)
 
     def stop(self):
         """Stop recording and cleanup."""
@@ -325,9 +374,12 @@ class VideoRecorder:
 
     def get_current_recording_path(self):
         """
-        Get path to current recording file.
+        Get path(s) to current recording file(s).
 
         Returns:
-            str: Path to current recording or None
+            dict: Dictionary with 'annotated' and 'raw' paths (None if not recording)
         """
-        return self.current_recording_path
+        return {
+            'annotated': self.current_recording_path_annotated,
+            'raw': self.current_recording_path_raw
+        }

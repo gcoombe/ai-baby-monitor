@@ -15,7 +15,8 @@ video_storage:
   retention_days: 7  # Days to keep recordings (0 = keep forever)
   quality: "medium"  # Options: low, medium, high
   include_timestamp: true  # Add timestamp overlay to videos
-  include_annotations: true  # Add motion contours, state, and position overlays to videos
+  save_annotated: true  # Save video with motion contours, state, and position overlays
+  save_raw: true  # Save raw video without annotations (can be saved simultaneously with annotated)
   pre_motion_buffer: 5  # Seconds of video before motion event
   post_motion_duration: 10  # Seconds to record after motion stops
 
