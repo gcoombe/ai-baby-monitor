@@ -20,10 +20,10 @@ An intelligent baby monitoring system that uses computer vision and audio proces
 ## Hardware Requirements
 
 ### Raspberry Pi Setup
-- Raspberry Pi 3B+ or newer (Pi 4 recommended for better performance)
+- Raspberry Pi 3B+ or newer (Pi 5 recommended for better performance)
 - Raspberry Pi Camera Module or USB webcam
 - USB microphone (optional, for audio monitoring)
-- MicroSD card (16GB+ recommended)
+- MicroSD card (64GB+ recommended)
 - Power supply
 
 ### Alternative Setup
@@ -126,9 +126,37 @@ Key settings to adjust:
 - `camera.device`: Camera index (0 for default, 1 for second camera)
 - `camera.resolution`: Lower resolution for Raspberry Pi (e.g., [640, 480])
 - `camera.rotation`: Rotate camera feed if needed (0, 90, 180, 270)
+- `camera.view`: Camera perspective ("top" for overhead, "side" for side view)
 - `detection.video.motion_threshold`: Lower = more sensitive
 - `detection.audio.cry_threshold`: Confidence threshold for cry detection
 - `notifications.methods`: Choose notification channels (console, pushbullet, webhook)
+
+### Video Recording & Annotations
+
+The system can record video with helpful visual overlays:
+
+```yaml
+video_storage:
+  enabled: false  # Set to true to enable recording
+  recording_mode: "motion"  # Options: continuous, motion, event
+  include_timestamp: true  # Show timestamp on video
+  include_annotations: true  # Show motion detection, state, and position overlays
+```
+
+**Recording Modes:**
+- `continuous`: Records all the time in segments
+- `motion`: Only records when motion is detected (saves space)
+- `event`: Records when baby is awake or stirring
+
+**Annotations** (when `include_annotations: true`):
+- **Motion contours**: Green outlines around detected movement
+- **Sleep state**: Shows "AWAKE" (red) or "ASLEEP" (green)
+- **Motion level**: Displays motion intensity in pixels
+- **Position detection**: Shows detected sleeping position and confidence (if pose estimation enabled)
+- **Unsafe position alerts**: Red warning if baby is in an unsafe position
+- **Timestamp**: Current date and time overlay
+
+These annotations are identical to what you see when testing with `test_video.py`, making it easy to review recorded footage and understand what the monitor detected.
 
 ## Usage
 

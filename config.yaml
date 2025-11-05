@@ -15,6 +15,7 @@ video_storage:
   retention_days: 7  # Days to keep recordings (0 = keep forever)
   quality: "medium"  # Options: low, medium, high
   include_timestamp: true  # Add timestamp overlay to videos
+  include_annotations: true  # Add motion contours, state, and position overlays to videos
   pre_motion_buffer: 5  # Seconds of video before motion event
   post_motion_duration: 10  # Seconds to record after motion stops
 
@@ -29,12 +30,10 @@ detection:
     motion_threshold: 25  # Sensitivity for motion detection (lower = more sensitive)
     motion_min_area: 500  # Minimum area in pixels to consider as motion
     awake_confidence_threshold: 0.7  # Confidence threshold for awake detection
-    check_interval: 1  # Seconds between checks
 
   audio:
     cry_threshold: 0.6  # Confidence threshold for cry detection
     noise_threshold: 1000  # RMS threshold for significant noise
-    check_interval: 1  # Seconds between checks
 
 sleep_tracking:
   awake_confirmation_time: 30  # Seconds of continuous activity to confirm awake
@@ -66,7 +65,7 @@ database:
 web:
   enabled: true
   host: "0.0.0.0"
-  port: 5000
+  port: 8080
   debug: false
 
 logging:

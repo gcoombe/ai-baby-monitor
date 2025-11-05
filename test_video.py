@@ -36,6 +36,8 @@ except ImportError:
     TopViewBabyPoseEstimator = None
     SideViewBabyPoseEstimator = None
 
+from monitors.video_annotator import VideoAnnotator
+
 logger = logging.getLogger(__name__)
 
 
@@ -74,6 +76,9 @@ class VideoTester:
         # Pose estimator (optional)
         self.pose_estimator = None
         self.use_pose_estimation = False
+        
+        # Video annotator for adding overlays
+        self.annotator = VideoAnnotator()
 
         # Analysis results
         self.results = {
@@ -298,43 +303,17 @@ class VideoTester:
 
         # Annotate frame if requested
         if annotate:
-            annotated = frame.copy()
-
-            # Draw motion contours
-            if motion_detected and len(contours) > 0:
-                cv2.drawContours(annotated, contours, -1, (0, 255, 0), 2)
-
-            # Draw pose keypoints
-            if keypoints is not None and self.pose_estimator:
-                annotated = self.pose_estimator.draw_keypoints(annotated, keypoints)
-
-            # Add text overlays
-            y_offset = 30
-            cv2.putText(annotated, f"Time: {frame_time}", (10, y_offset),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-
-            y_offset += 30
-            state_text = "AWAKE" if self.is_baby_awake else "ASLEEP"
-            state_color = (0, 0, 255) if self.is_baby_awake else (0, 255, 0)
-            cv2.putText(annotated, f"State: {state_text}", (10, y_offset),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, state_color, 2)
-
-            if motion_detected:
-                y_offset += 30
-                cv2.putText(annotated, f"Motion: {motion_level:.0f}", (10, y_offset),
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 0), 2)
-
-            if position and position != 'unknown':
-                y_offset += 30
-                cv2.putText(annotated, f"Position: {position} ({position_confidence:.2%})",
-                           (10, y_offset), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-
-                if self.pose_estimator and self.pose_estimator.is_unsafe_position(position):
-                    y_offset += 30
-                    cv2.putText(annotated, "UNSAFE POSITION!", (10, y_offset),
-                               cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
-
-            return annotated
+            return self.annotator.annotate_frame(
+                frame,
+                motion_level=motion_level if motion_detected else 0,
+                contours=contours if motion_detected else [],
+                is_baby_awake=self.is_baby_awake,
+                keypoints=keypoints,
+                position=position,
+                position_confidence=position_confidence,
+                pose_estimator=self.pose_estimator,
+                frame_time=frame_time
+            )
 
         return frame
 

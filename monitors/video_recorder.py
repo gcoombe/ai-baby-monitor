@@ -6,6 +6,8 @@ import os
 import logging
 from datetime import datetime
 from collections import deque
+import numpy as np
+from monitors.video_annotator import VideoAnnotator
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +32,7 @@ class VideoRecorder:
         self.segment_duration = storage_config.get('segment_duration', 300)
         self.quality = storage_config.get('quality', 'medium')
         self.include_timestamp = storage_config.get('include_timestamp', True)
+        self.include_annotations = storage_config.get('include_annotations', True)
         self.pre_motion_buffer_size = storage_config.get('pre_motion_buffer', 5)
         self.post_motion_duration = storage_config.get('post_motion_duration', 10)
 
@@ -44,13 +47,29 @@ class VideoRecorder:
         self.current_recording_path = None
         self.pre_motion_frames = deque(maxlen=self.pre_motion_buffer_size * self.fps)
         self.post_motion_frames_remaining = 0
+        
+        # Current frame annotation data
+        self.current_frame_data = {
+            'motion_level': 0,
+            'contours': [],
+            'is_baby_awake': False,
+            'keypoints': None,
+            'position': None,
+            'position_confidence': 0,
+            'pose_estimator': None
+        }
+        
+        # Video annotator for adding overlays
+        self.annotator = VideoAnnotator()
 
         # Create storage directory if enabled
         if self.enabled:
             os.makedirs(self.storage_path, exist_ok=True)
             logger.info(f"Video recorder initialized - Mode: {self.recording_mode}, Path: {self.storage_path}")
 
-    def process_frame(self, frame, motion_detected=False, is_baby_awake=False, last_significant_motion=None):
+    def process_frame(self, frame, motion_detected=False, is_baby_awake=False, 
+                      last_significant_motion=None, motion_level=0, contours=None,
+                      keypoints=None, position=None, position_confidence=0, pose_estimator=None):
         """
         Process a frame for recording.
 
@@ -59,15 +78,43 @@ class VideoRecorder:
             motion_detected: Whether motion was detected in this frame
             is_baby_awake: Whether baby is currently awake
             last_significant_motion: Datetime of last significant motion
+            motion_level: Motion area level (pixels)
+            contours: Motion contours for annotation
+            keypoints: Pose estimation keypoints
+            position: Detected sleeping position
+            position_confidence: Confidence of position detection
+            pose_estimator: Pose estimator instance for drawing keypoints
         """
         if not self.enabled:
             return
 
         now = datetime.now()
+        
+        # Store current frame annotation data
+        self.current_frame_data = {
+            'motion_level': motion_level,
+            'contours': contours if contours is not None else [],
+            'is_baby_awake': is_baby_awake,
+            'keypoints': keypoints,
+            'position': position,
+            'position_confidence': position_confidence,
+            'pose_estimator': pose_estimator
+        }
 
-        # Manage pre-motion buffer for motion mode
+        # Manage pre-motion buffer for motion mode (store frame and annotation data)
         if self.recording_mode == 'motion':
-            self.pre_motion_frames.append((frame.copy(), now))
+            frame_data = {
+                'frame': frame.copy(),
+                'timestamp': now,
+                'motion_level': motion_level,
+                'contours': contours if contours is not None else [],
+                'is_baby_awake': is_baby_awake,
+                'keypoints': keypoints,
+                'position': position,
+                'position_confidence': position_confidence,
+                'pose_estimator': pose_estimator
+            }
+            self.pre_motion_frames.append(frame_data)
 
         # Determine if we should be recording
         should_record = self._should_record(motion_detected, is_baby_awake, last_significant_motion)
@@ -79,8 +126,8 @@ class VideoRecorder:
             # Write pre-motion buffer frames if in motion mode
             if self.recording_mode == 'motion' and len(self.pre_motion_frames) > 0:
                 logger.info(f"Writing {len(self.pre_motion_frames)} pre-motion buffer frames")
-                for buffered_frame, _ in self.pre_motion_frames:
-                    self._write_frame(buffered_frame)
+                for frame_data in self.pre_motion_frames:
+                    self._write_frame(frame_data['frame'], frame_data=frame_data)
 
         # Write current frame if recording
         if self.recording:
@@ -203,9 +250,31 @@ class VideoRecorder:
         codec_str, quality = quality_settings.get(self.quality, ('mp4v', 20))
         return cv2.VideoWriter_fourcc(*codec_str), quality
 
+    def _add_annotations(self, frame, frame_data):
+        """
+        Add annotations to frame using VideoAnnotator.
+
+        Args:
+            frame: Video frame
+            frame_data: Dict containing annotation data
+
+        Returns:
+            Annotated frame
+        """
+        return self.annotator.annotate_frame(
+            frame,
+            motion_level=frame_data.get('motion_level', 0),
+            contours=frame_data.get('contours', []),
+            is_baby_awake=frame_data.get('is_baby_awake', False),
+            keypoints=frame_data.get('keypoints'),
+            position=frame_data.get('position'),
+            position_confidence=frame_data.get('position_confidence', 0),
+            pose_estimator=frame_data.get('pose_estimator')
+        )
+
     def _add_timestamp_overlay(self, frame):
         """
-        Add timestamp overlay to frame.
+        Add timestamp overlay to frame using VideoAnnotator.
 
         Args:
             frame: Video frame
@@ -216,36 +285,28 @@ class VideoRecorder:
         if not self.include_timestamp:
             return frame
 
-        frame_copy = frame.copy()
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        return self.annotator.add_timestamp_overlay(frame, timestamp)
 
-        # Add semi-transparent background for text
-        cv2.rectangle(frame_copy, (5, 5), (250, 35), (0, 0, 0), -1)
-        cv2.rectangle(frame_copy, (5, 5), (250, 35), (255, 255, 255), 1)
-
-        # Add timestamp text
-        cv2.putText(
-            frame_copy,
-            timestamp,
-            (10, 25),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.6,
-            (255, 255, 255),
-            1,
-            cv2.LINE_AA
-        )
-
-        return frame_copy
-
-    def _write_frame(self, frame):
+    def _write_frame(self, frame, frame_data=None):
         """
         Write frame to video file.
 
         Args:
             frame: Video frame to write
+            frame_data: Optional dict with annotation data (motion_level, contours, etc.)
         """
         if self.video_writer is not None and self.recording:
-            frame_to_write = self._add_timestamp_overlay(frame)
+            # Apply annotations if enabled
+            if self.include_annotations:
+                if frame_data is None:
+                    frame_data = self.current_frame_data
+                frame_to_write = self._add_annotations(frame, frame_data)
+            else:
+                frame_to_write = frame.copy()
+            
+            # Add timestamp overlay
+            frame_to_write = self._add_timestamp_overlay(frame_to_write)
             self.video_writer.write(frame_to_write)
 
     def stop(self):

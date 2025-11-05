@@ -1,5 +1,6 @@
 """
 Video monitoring module for detecting motion and determining if baby is awake.
+Uses picamera2 for Raspberry Pi camera support.
 """
 import cv2
 import numpy as np
@@ -8,13 +9,7 @@ from threading import Thread, Event
 from datetime import datetime, timedelta
 import time
 from monitors.video_recorder import VideoRecorder
-
-# Try to import picamera2 for Raspberry Pi support
-try:
-    from picamera2 import Picamera2
-    PICAMERA2_AVAILABLE = True
-except ImportError:
-    PICAMERA2_AVAILABLE = False
+from picamera2 import Picamera2
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +40,6 @@ class VideoMonitor:
         self.motion_threshold = config['detection']['video']['motion_threshold']    
         self.motion_min_area = config['detection']['video']['motion_min_area']
         self.awake_threshold = config['detection']['video']['awake_confidence_threshold']
-        self.check_interval = config['detection']['video']['check_interval']
 
         # Sleep tracking settings
         self.awake_confirmation_time = config['sleep_tracking']['awake_confirmation_time']
@@ -53,7 +47,6 @@ class VideoMonitor:
 
         # State tracking
         self.camera = None
-        self.use_picamera2 = False
         self.running = False
         self.thread = None
         self.stop_event = Event()
@@ -84,99 +77,39 @@ class VideoMonitor:
             logger.warning("Video monitor already running")
             return
 
-        logger.info("Starting video monitor...")
+        logger.info("Starting video monitor with picamera2...")
         
-        # Try different backends for Raspberry Pi compatibility
-        backends = [
-            (cv2.CAP_V4L2, "V4L2"),
-            (cv2.CAP_ANY, "ANY"),
-            (None, "default")
-        ]
-        
-        camera_opened = False
-        
-        # First try OpenCV backends
-        for backend, backend_name in backends:
-            try:
-                logger.info(f"Trying to open camera with OpenCV {backend_name} backend...")
-                if backend is not None:
-                    self.camera = cv2.VideoCapture(self.device, backend)
-                else:
-                    self.camera = cv2.VideoCapture(self.device)
-                
-                if self.camera.isOpened():
-                    # Try to read a test frame
-                    ret, _ = self.camera.read()
-                    if ret:
-                        logger.info(f"Successfully opened camera with OpenCV {backend_name} backend")
-                        camera_opened = True
-                        self.use_picamera2 = False
-                        break
-                    else:
-                        logger.warning(f"Camera opened but failed to read frame with {backend_name} backend")
-                        self.camera.release()
-                        self.camera = None
-                else:
-                    logger.warning(f"Failed to open camera with {backend_name} backend")
-                    self.camera = None
-            except Exception as e:
-                logger.warning(f"Exception with {backend_name} backend: {e}")
-                self.camera = None
-
-        # If OpenCV failed, try picamera2
-        if not camera_opened and PICAMERA2_AVAILABLE:
-            try:
-                logger.info("OpenCV failed, trying picamera2...")
-                self.camera = Picamera2()
-                
-                # Configure camera
-                camera_config = self.camera.create_preview_configuration(
-                    main={"size": self.resolution, "format": "RGB888"}
-                )
-                self.camera.configure(camera_config)
-                self.camera.start()
-                
-                # Give camera time to warm up
-                time.sleep(2)
-                
-                # Try to capture a test frame
-                test_frame = self.camera.capture_array()
-                if test_frame is not None and test_frame.size > 0:
-                    logger.info(f"Successfully opened camera with picamera2")
-                    logger.info(f"Camera properties: {test_frame.shape[1]}x{test_frame.shape[0]}")
-                    camera_opened = True
-                    self.use_picamera2 = True
-                else:
-                    logger.error("picamera2 opened but failed to capture frame")
-                    self.camera.close()
-                    self.camera = None
-            except Exception as e:
-                logger.error(f"Failed to initialize picamera2: {e}")
-                if self.camera:
-                    try:
-                        self.camera.close()
-                    except:
-                        pass
-                    self.camera = None
-
-        if not camera_opened:
-            error_msg = "Failed to open camera with any backend"
-            if not PICAMERA2_AVAILABLE:
-                error_msg += ". Consider installing picamera2: pip install picamera2"
-            logger.error(error_msg)
-            return False
-
-        # Set camera properties (only for OpenCV)
-        if not self.use_picamera2:
-            self.camera.set(cv2.CAP_PROP_FRAME_WIDTH, self.resolution[0])
-            self.camera.set(cv2.CAP_PROP_FRAME_HEIGHT, self.resolution[1])
-            self.camera.set(cv2.CAP_PROP_FPS, self.fps)
+        try:
+            self.camera = Picamera2()
             
-            # Log actual camera properties
-            actual_width = self.camera.get(cv2.CAP_PROP_FRAME_WIDTH)
-            actual_height = self.camera.get(cv2.CAP_PROP_FRAME_HEIGHT)
-            actual_fps = self.camera.get(cv2.CAP_PROP_FPS)
-            logger.info(f"Camera properties: {actual_width}x{actual_height} @ {actual_fps}fps")
+            # Configure camera
+            camera_config = self.camera.create_preview_configuration(
+                main={"size": self.resolution, "format": "RGB888"}
+            )
+            self.camera.configure(camera_config)
+            self.camera.start()
+            
+            # Give camera time to warm up
+            time.sleep(2)
+            
+            # Try to capture a test frame
+            test_frame = self.camera.capture_array()
+            if test_frame is None or test_frame.size == 0:
+                logger.error("picamera2 opened but failed to capture frame")
+                self.camera.close()
+                return False
+                
+            logger.info(f"Successfully opened camera with picamera2")
+            logger.info(f"Camera properties: {test_frame.shape[1]}x{test_frame.shape[0]}")
+            
+        except Exception as e:
+            logger.error(f"Failed to initialize picamera2: {e}")
+            if self.camera:
+                try:
+                    self.camera.close()
+                except:
+                    pass
+            return False
 
         self.running = True
         self.stop_event.clear()
@@ -199,11 +132,8 @@ class VideoMonitor:
             self.thread.join(timeout=5)
 
         if self.camera:
-            if self.use_picamera2:
-                self.camera.stop()
-                self.camera.close()
-            else:
-                self.camera.release()
+            self.camera.stop()
+            self.camera.close()
 
         # Stop video recorder
         self.video_recorder.stop()
@@ -214,14 +144,10 @@ class VideoMonitor:
         """Main monitoring loop"""
         while self.running and not self.stop_event.is_set():
             try:
-                # Read frame based on camera type
-                if self.use_picamera2:
-                    frame = self.camera.capture_array()
-                    ret = frame is not None and frame.size > 0
-                else:
-                    ret, frame = self.camera.read()
+                # Capture frame from picamera2
+                frame = self.camera.capture_array()
 
-                if not ret or frame is None:
+                if frame is None or frame.size == 0:
                     logger.warning("Failed to read frame from camera")
                     time.sleep(1)
                     continue
@@ -231,7 +157,7 @@ class VideoMonitor:
                     frame = self._rotate_frame(frame, self.rotation)
 
                 # Detect motion
-                motion_detected, motion_level = self._detect_motion(frame)
+                motion_detected, motion_level, contours = self._detect_motion(frame)
 
                 if motion_detected:
                     self.last_motion_time = datetime.now()
@@ -254,12 +180,12 @@ class VideoMonitor:
                     frame,
                     motion_detected=motion_detected,
                     is_baby_awake=self.is_baby_awake,
-                    last_significant_motion=self.last_significant_motion
+                    last_significant_motion=self.last_significant_motion,
+                    motion_level=motion_level,
+                    contours=contours
                 )
 
-                # Sleep to maintain check interval
-                time.sleep(self.check_interval)
-
+              
             except Exception as e:
                 logger.error(f"Error in video monitor loop: {e}")
                 time.sleep(1)
@@ -282,7 +208,7 @@ class VideoMonitor:
             frame: Current video frame
 
         Returns:
-            tuple: (motion_detected, motion_level)
+            tuple: (motion_detected, motion_level, contours)
         """
         # Apply background subtraction
         fg_mask = self.background_subtractor.apply(frame)
@@ -303,7 +229,7 @@ class VideoMonitor:
 
         motion_detected = total_area > self.motion_min_area
 
-        return motion_detected, total_area
+        return motion_detected, total_area, contours
 
     def _handle_significant_motion(self, motion_level):
         """

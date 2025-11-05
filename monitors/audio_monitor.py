@@ -50,7 +50,6 @@ class AudioMonitor:
         # Detection settings
         self.cry_threshold = config['detection']['audio']['cry_threshold']
         self.noise_threshold = config['detection']['audio']['noise_threshold']
-        self.check_interval = config['detection']['audio']['check_interval']
 
         # State tracking
         self.audio_interface = None
@@ -134,8 +133,7 @@ class AudioMonitor:
                 # Analyze audio
                 self._analyze_audio(audio_array)
 
-                # Sleep to maintain check interval
-                time.sleep(self.check_interval)
+
 
             except Exception as e:
                 logger.error(f"Error in audio monitor loop: {e}")
