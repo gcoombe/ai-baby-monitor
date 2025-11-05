@@ -3,7 +3,7 @@
 camera:
   device: 0  # Camera device index (0 for default)
   resolution: [640, 480]
-  fps: 10
+  fps: 15
   rotation: 0  # 0, 90, 180, or 270 degrees
   view: "top"  # Camera view configuration: "top" (above baby) or "side" (beside baby)
 
@@ -13,7 +13,7 @@ video_storage:
   recording_mode: "motion"  # Options: continuous, motion, event
   segment_duration: 300  # Seconds per video file (5 minutes)
   retention_days: 7  # Days to keep recordings (0 = keep forever)
-  quality: "medium"  # Options: low, medium, high
+  quality: "high"  # Options: low, medium, high (high uses H.264 with hardware acceleration)
   include_timestamp: true  # Add timestamp overlay to videos
   save_annotated: true  # Save video with motion contours, state, and position overlays
   save_raw: true  # Save raw video without annotations (can be saved simultaneously with annotated)
