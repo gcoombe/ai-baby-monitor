@@ -209,8 +209,8 @@ class VideoRecorder:
         # Generate base filename with timestamp
         timestamp = start_time.strftime('%Y%m%d_%H%M%S')
         
-        # Get codec
-        fourcc, _ = self._get_video_codec()
+        # Get codec with fallback support
+        fourcc = self._get_working_codec()
         
         # Create annotated video writer if enabled
         if self.save_annotated:
@@ -283,10 +283,77 @@ class VideoRecorder:
         quality_settings = {
             'low': ('mp4v', 15),
             'medium': ('mp4v', 20),
-            'high': ('avc1', 25)
+            'high': ('X264', 25)  # Use X264 for better H.264 compatibility on Raspberry Pi
         }
         codec_str, quality = quality_settings.get(self.quality, ('mp4v', 20))
-        return cv2.VideoWriter_fourcc(*codec_str), quality
+        
+        # Try to create codec
+        fourcc = cv2.VideoWriter_fourcc(*codec_str)
+        
+        # Log the codec being used
+        logger.info(f"Using video codec: {codec_str} (quality level: {quality})")
+        
+        return fourcc, quality
+    
+    def _get_working_codec(self):
+        """
+        Get a working codec for the system with fallback support.
+        Tries multiple codecs and returns the first one that works.
+        
+        Returns:
+            fourcc: Working codec fourcc code
+        """
+        # Define codec priority based on quality setting
+        if self.quality == 'high':
+            # Try H.264 variants in order of preference
+            codecs_to_try = [
+                ('X264', 'X264 software H.264'),
+                ('H264', 'H264 codec'),
+                ('avc1', 'avc1 H.264'),
+                ('mp4v', 'MPEG-4 fallback')
+            ]
+        elif self.quality == 'medium':
+            codecs_to_try = [
+                ('mp4v', 'MPEG-4 Part 2'),
+                ('X264', 'X264 software H.264 fallback')
+            ]
+        else:  # low
+            codecs_to_try = [
+                ('mp4v', 'MPEG-4 Part 2')
+            ]
+        
+        # Try each codec with a test writer
+        for codec_str, description in codecs_to_try:
+            try:
+                fourcc = cv2.VideoWriter_fourcc(*codec_str)
+                
+                # Test if codec works by creating a temporary writer
+                test_path = os.path.join(self.storage_path, '.codec_test.mp4')
+                test_writer = cv2.VideoWriter(
+                    test_path,
+                    fourcc,
+                    self.fps,
+                    self.resolution
+                )
+                
+                if test_writer.isOpened():
+                    test_writer.release()
+                    # Clean up test file
+                    if os.path.exists(test_path):
+                        os.remove(test_path)
+                    logger.info(f"Selected codec: {codec_str} ({description})")
+                    return fourcc
+                else:
+                    test_writer.release()
+                    logger.warning(f"Codec {codec_str} ({description}) failed to open, trying next...")
+                    
+            except Exception as e:
+                logger.warning(f"Error testing codec {codec_str}: {e}")
+                continue
+        
+        # Ultimate fallback - mp4v should always work
+        logger.warning("All preferred codecs failed, using mp4v fallback")
+        return cv2.VideoWriter_fourcc(*'mp4v')
 
     def _add_annotations(self, frame, frame_data):
         """
