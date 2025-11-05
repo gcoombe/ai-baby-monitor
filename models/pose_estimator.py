@@ -49,7 +49,7 @@ class BabyPoseEstimator(ABC):
     LEFT_ANKLE = 15
     RIGHT_ANKLE = 16
 
-    def __init__(self, model_path='tf_models/movenet_thunder.tflite'):
+    def __init__(self, model_path='tf_models/movenet_lightning.tflite'):
         """
         Initialize pose estimator.
 
