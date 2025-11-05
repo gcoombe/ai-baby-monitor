@@ -212,9 +212,12 @@ class VideoRecorder:
         # Get codec with fallback support
         fourcc = self._get_working_codec()
         
+        # Determine file extension based on codec compatibility
+        file_ext = self._get_file_extension()
+        
         # Create annotated video writer if enabled
         if self.save_annotated:
-            filename_annotated = f"recording_{timestamp}_annotated.mp4"
+            filename_annotated = f"recording_{timestamp}_annotated{file_ext}"
             self.current_recording_path_annotated = os.path.join(self.storage_path, filename_annotated)
             
             self.video_writer_annotated = cv2.VideoWriter(
@@ -232,7 +235,7 @@ class VideoRecorder:
         
         # Create raw video writer if enabled
         if self.save_raw:
-            filename_raw = f"recording_{timestamp}_raw.mp4"
+            filename_raw = f"recording_{timestamp}_raw{file_ext}"
             self.current_recording_path_raw = os.path.join(self.storage_path, filename_raw)
             
             self.video_writer_raw = cv2.VideoWriter(
@@ -301,34 +304,33 @@ class VideoRecorder:
         Tries multiple codecs and returns the first one that works.
         
         Returns:
-            fourcc: Working codec fourcc code
+            tuple: (fourcc, codec_name) Working codec fourcc code and name
         """
         # Define codec priority based on quality setting
         if self.quality == 'high':
-            # Try H.264 variants in order of preference
+            # Try H.264 variants in order of preference, with different containers
             codecs_to_try = [
-                ('X264', 'X264 software H.264'),
-                ('H264', 'H264 codec'),
-                ('avc1', 'avc1 H.264'),
-                ('mp4v', 'MPEG-4 fallback')
+                ('XVID', 'XVID (AVI)', '.avi'),  # Good compression, widely supported
+                ('MJPG', 'MJPEG (AVI)', '.avi'),  # Fast, larger files
+                ('mp4v', 'MPEG-4 (MP4)', '.mp4')  # Fallback
             ]
         elif self.quality == 'medium':
             codecs_to_try = [
-                ('mp4v', 'MPEG-4 Part 2'),
-                ('X264', 'X264 software H.264 fallback')
+                ('mp4v', 'MPEG-4 (MP4)', '.mp4'),
+                ('XVID', 'XVID (AVI)', '.avi')
             ]
         else:  # low
             codecs_to_try = [
-                ('mp4v', 'MPEG-4 Part 2')
+                ('mp4v', 'MPEG-4 (MP4)', '.mp4')
             ]
         
         # Try each codec with a test writer
-        for codec_str, description in codecs_to_try:
+        for codec_str, description, ext in codecs_to_try:
             try:
                 fourcc = cv2.VideoWriter_fourcc(*codec_str)
                 
                 # Test if codec works by creating a temporary writer
-                test_path = os.path.join(self.storage_path, '.codec_test.mp4')
+                test_path = os.path.join(self.storage_path, f'.codec_test{ext}')
                 test_writer = cv2.VideoWriter(
                     test_path,
                     fourcc,
@@ -342,6 +344,9 @@ class VideoRecorder:
                     if os.path.exists(test_path):
                         os.remove(test_path)
                     logger.info(f"Selected codec: {codec_str} ({description})")
+                    # Store the selected codec and extension for later use
+                    self._selected_codec_name = codec_str
+                    self._selected_file_ext = ext
                     return fourcc
                 else:
                     test_writer.release()
@@ -353,7 +358,13 @@ class VideoRecorder:
         
         # Ultimate fallback - mp4v should always work
         logger.warning("All preferred codecs failed, using mp4v fallback")
+        self._selected_codec_name = 'mp4v'
+        self._selected_file_ext = '.mp4'
         return cv2.VideoWriter_fourcc(*'mp4v')
+    
+    def _get_file_extension(self):
+        """Get the appropriate file extension for the selected codec."""
+        return getattr(self, '_selected_file_ext', '.mp4')
 
     def _add_annotations(self, frame, frame_data):
         """

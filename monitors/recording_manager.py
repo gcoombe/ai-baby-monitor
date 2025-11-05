@@ -43,8 +43,9 @@ class RecordingManager:
         bytes_freed = 0
 
         try:
-            # Match both annotated and raw recording files
-            for pattern in ["recording_*_annotated.mp4", "recording_*_raw.mp4", "recording_*.mp4"]:
+            # Match both annotated and raw recording files (mp4 and avi formats)
+            for pattern in ["recording_*_annotated.mp4", "recording_*_raw.mp4", "recording_*.mp4",
+                          "recording_*_annotated.avi", "recording_*_raw.avi", "recording_*.avi"]:
                 for file_path in Path(self.storage_path).glob(pattern):
                     # Get file modification time
                     file_mtime = datetime.fromtimestamp(file_path.stat().st_mtime)
@@ -83,19 +84,21 @@ class RecordingManager:
         recordings = []
 
         try:
-            # Match both annotated and raw recording files, plus legacy files
-            for pattern in ["recording_*_annotated.mp4", "recording_*_raw.mp4", "recording_*.mp4"]:
+            # Match both annotated and raw recording files, plus legacy files (mp4 and avi formats)
+            for pattern in ["recording_*_annotated.mp4", "recording_*_raw.mp4", "recording_*.mp4",
+                          "recording_*_annotated.avi", "recording_*_raw.avi", "recording_*.avi"]:
                 for file_path in Path(self.storage_path).glob(pattern):
                     # Skip files that match more specific patterns when using the generic pattern
-                    if pattern == "recording_*.mp4" and ("_annotated.mp4" in file_path.name or "_raw.mp4" in file_path.name):
+                    if (pattern in ["recording_*.mp4", "recording_*.avi"] and 
+                        ("_annotated." in file_path.name or "_raw." in file_path.name)):
                         continue
                     
                     stat = file_path.stat()
                     # Determine recording type
                     recording_type = 'legacy'
-                    if '_annotated.mp4' in file_path.name:
+                    if '_annotated.' in file_path.name:
                         recording_type = 'annotated'
-                    elif '_raw.mp4' in file_path.name:
+                    elif '_raw.' in file_path.name:
                         recording_type = 'raw'
                     
                     recordings.append({
@@ -144,10 +147,12 @@ class RecordingManager:
         raw_size = 0
 
         try:
-            for pattern in ["recording_*_annotated.mp4", "recording_*_raw.mp4", "recording_*.mp4"]:
+            for pattern in ["recording_*_annotated.mp4", "recording_*_raw.mp4", "recording_*.mp4",
+                          "recording_*_annotated.avi", "recording_*_raw.avi", "recording_*.avi"]:
                 for file_path in Path(self.storage_path).glob(pattern):
                     # Skip files that match more specific patterns when using the generic pattern
-                    if pattern == "recording_*.mp4" and ("_annotated.mp4" in file_path.name or "_raw.mp4" in file_path.name):
+                    if (pattern in ["recording_*.mp4", "recording_*.avi"] and 
+                        ("_annotated." in file_path.name or "_raw." in file_path.name)):
                         continue
                     
                     stat = file_path.stat()
@@ -155,10 +160,10 @@ class RecordingManager:
                     file_count += 1
 
                     # Track by type
-                    if '_annotated.mp4' in file_path.name:
+                    if '_annotated.' in file_path.name:
                         annotated_count += 1
                         annotated_size += stat.st_size
-                    elif '_raw.mp4' in file_path.name:
+                    elif '_raw.' in file_path.name:
                         raw_count += 1
                         raw_size += stat.st_size
                     else:
@@ -206,8 +211,8 @@ class RecordingManager:
             logger.error(f"Invalid filename: {filename}")
             return False
 
-        # Ensure it's a recording file (annotated, raw, or legacy)
-        valid_suffixes = ['_annotated.mp4', '_raw.mp4', '.mp4']
+        # Ensure it's a recording file (annotated, raw, or legacy; mp4 or avi)
+        valid_suffixes = ['_annotated.mp4', '_raw.mp4', '.mp4', '_annotated.avi', '_raw.avi', '.avi']
         is_valid = filename.startswith('recording_') and any(filename.endswith(suffix) for suffix in valid_suffixes)
         
         if not is_valid:
